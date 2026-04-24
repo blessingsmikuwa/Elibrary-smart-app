@@ -1,4 +1,5 @@
- import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'features/auth/screens/login_screen.dart';
 
 void main() {
   runApp(const ELibraryApp());
@@ -15,14 +16,7 @@ class ELibraryApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const Scaffold(
-        body: Center(
-          child: Text(
-            'eLibrary Mobile App',
-            style: TextStyle(fontSize: 20),
-          ),
-        ),
-      ),
+      home: const LoginScreen(),
     );
   }
 }
