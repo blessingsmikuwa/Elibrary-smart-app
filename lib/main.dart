@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/theme/app_theme.dart';
 import 'features/auth/screens/login_screen.dart';
 
 void main() {
@@ -13,9 +14,7 @@ class ELibraryApp extends StatelessWidget {
     return MaterialApp(
       title: 'eLibrary Mobile',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
+      theme: AppTheme.darkTheme,
       home: const LoginScreen(),
     );
   }
