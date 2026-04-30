@@ -37,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Replace with backend API (Dio)
+      // Replace this mock delay with a backend API call when it is available.
       await Future.delayed(const Duration(seconds: 2));
 
       return {
@@ -46,7 +46,9 @@ class _LoginScreenState extends State<LoginScreen> {
         "token": "dummy_token_123",
       };
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -58,6 +60,8 @@ class _LoginScreenState extends State<LoginScreen> {
       password: _passwordController.text.trim(),
       role: _selectedRole,
     );
+
+    if (!mounted) return;
 
     if (!result["success"]) {
       ScaffoldMessenger.of(context).showSnackBar(
