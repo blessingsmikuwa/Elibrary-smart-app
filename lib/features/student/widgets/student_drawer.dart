@@ -1,4 +1,4 @@
- import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 
 class StudentDrawer extends StatelessWidget {
@@ -18,10 +18,7 @@ class StudentDrawer extends StatelessWidget {
                 SizedBox(width: 10),
                 Text(
                   "EduLib Malawi",
-                  style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 18,
-                  ),
+                  style: TextStyle(color: AppColors.text, fontSize: 18),
                 ),
               ],
             ),
@@ -41,12 +38,9 @@ class StudentDrawer extends StatelessWidget {
     );
   }
 
-  Widget drawerItem(String text, {Color color = const Color(0xFF424242)}) {
+  Widget drawerItem(String text, {Color color = AppColors.text2}) {
     return ListTile(
-      title: Text(
-        text,
-        style: TextStyle(color: color),
-      ),
+      title: Text(text, style: TextStyle(color: color)),
       onTap: () {},
     );
   }
