@@ -543,7 +543,7 @@ class _BooksScreenState extends State<BooksScreen> {
                           ],
                         ),
                         subtitle: Text(
-                          '${book.subject} • ${book.classLevel} • ${book.docType}',
+                          '${book.subject} - ${book.classLevel} - ${book.docType}',
                           style: TextStyle(
                             color: AppColors.text2,
                             fontSize: 12,

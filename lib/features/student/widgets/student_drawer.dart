@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../core/theme/app_theme.dart';
 
 class StudentDrawer extends StatelessWidget {
@@ -14,25 +15,22 @@ class StudentDrawer extends StatelessWidget {
             decoration: const BoxDecoration(color: AppColors.surface),
             child: Row(
               children: const [
-                Text("📚", style: TextStyle(fontSize: 28)),
+                Icon(Icons.menu_book_rounded, color: AppColors.primary),
                 SizedBox(width: 10),
                 Text(
-                  "EduLib Malawi",
+                  'EduLib Malawi',
                   style: TextStyle(color: AppColors.text, fontSize: 18),
                 ),
               ],
             ),
           ),
-
-          drawerItem("🏠 Home"),
-          drawerItem("📖 Resources"),
-          drawerItem("📝 Quizzes"),
-          drawerItem("� Past Papers"),
-
+          drawerItem('Home'),
+          drawerItem('Resources'),
+          drawerItem('Quizzes'),
+          drawerItem('Past Papers'),
           const Spacer(),
-
-          drawerItem("⚙️ Settings"),
-          drawerItem("🚪 Logout", color: AppColors.accent4),
+          drawerItem('Settings'),
+          drawerItem('Logout', color: AppColors.accent4),
         ],
       ),
     );
