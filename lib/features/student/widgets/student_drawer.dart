@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../screens/settings_screen.dart';
 
 class StudentDrawer extends StatelessWidget {
   const StudentDrawer({super.key});
@@ -29,17 +30,29 @@ class StudentDrawer extends StatelessWidget {
           drawerItem('Quizzes'),
           drawerItem('Past Papers'),
           const Spacer(),
-          drawerItem('Settings'),
+          drawerItem(
+            'Settings',
+            onTap: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
           drawerItem('Logout', color: AppColors.accent4),
         ],
       ),
     );
   }
 
-  Widget drawerItem(String text, {Color color = AppColors.text2}) {
+  Widget drawerItem(
+    String text, {
+    Color color = AppColors.text2,
+    VoidCallback? onTap,
+  }) {
     return ListTile(
       title: Text(text, style: TextStyle(color: color)),
-      onTap: () {},
+      onTap: onTap,
     );
   }
 }

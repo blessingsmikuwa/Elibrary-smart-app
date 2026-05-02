@@ -293,7 +293,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _subject,
+            initialValue: _subject,
             isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'Subject',
@@ -318,7 +318,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _level,
+                  initialValue: _level,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Level',
@@ -341,7 +341,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _topic,
+                  initialValue: _topic,
                   isExpanded: true,
                   decoration: InputDecoration(
                     labelText: _subject == null

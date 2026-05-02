@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -27,75 +27,6 @@ class PastPaper {
   });
 }
 
-final List<PastPaper> _dummyPastPapers = [
-  PastPaper(
-    id: 'paper-001',
-    title: 'Mathematics Paper 1',
-    description: 'Practice algebra, geometry, and number theory questions.',
-    subject: 'Mathematics',
-    classLevel: 'Form 4',
-    targetAudience: 'Students',
-    fileUrl: 'https://example.com/past-papers/mathematics-paper-1.pdf',
-    createdAt: DateTime(2025, 10, 12),
-    uploaderName: 'Admin',
-  ),
-  PastPaper(
-    id: 'paper-002',
-    title: 'English Language Paper 2',
-    description: 'Essay writing, comprehension, and grammar revision paper.',
-    subject: 'English',
-    classLevel: 'Form 3',
-    targetAudience: 'Students',
-    fileUrl: 'https://example.com/past-papers/english-language-paper-2.pdf',
-    createdAt: DateTime(2025, 9, 28),
-    uploaderName: 'Admin',
-  ),
-  PastPaper(
-    id: 'paper-003',
-    title: 'Biology Practical Revision',
-    description: 'Common practical questions with diagrams and observations.',
-    subject: 'Biology',
-    classLevel: 'Form 4',
-    targetAudience: 'Students',
-    fileUrl: 'https://example.com/past-papers/biology-practical-revision.pdf',
-    createdAt: DateTime(2025, 8, 18),
-    uploaderName: 'Science Department',
-  ),
-  PastPaper(
-    id: 'paper-004',
-    title: 'Physical Science Paper 1',
-    description: 'Mechanics, electricity, waves, and basic chemistry revision.',
-    subject: 'Physical Science',
-    classLevel: 'Form 2',
-    targetAudience: 'Students',
-    fileUrl: 'https://example.com/past-papers/physical-science-paper-1.pdf',
-    createdAt: DateTime(2025, 7, 5),
-    uploaderName: 'Science Department',
-  ),
-  PastPaper(
-    id: 'paper-005',
-    title: 'Geography Paper 1',
-    description: 'Map reading, weather, population, and settlement questions.',
-    subject: 'Geography',
-    classLevel: 'Form 3',
-    targetAudience: 'Students',
-    fileUrl: 'https://example.com/past-papers/geography-paper-1.pdf',
-    createdAt: DateTime(2025, 6, 21),
-    uploaderName: 'Humanities Department',
-  ),
-  PastPaper(
-    id: 'paper-006',
-    title: 'History Paper 2',
-    description: 'Regional history, source analysis, and structured responses.',
-    subject: 'History',
-    classLevel: 'Form 1',
-    targetAudience: 'Students',
-    fileUrl: 'https://example.com/past-papers/history-paper-2.pdf',
-    createdAt: DateTime(2025, 5, 14),
-    uploaderName: 'Humanities Department',
-  ),
-];
-
 class PastPapersScreen extends StatefulWidget {
   const PastPapersScreen({super.key});
 
@@ -105,6 +36,7 @@ class PastPapersScreen extends StatefulWidget {
 
 class _PastPapersScreenState extends State<PastPapersScreen> {
   static const int _itemsPerPage = 12;
+
   static const List<List<Color>> _paperGradients = [
     [Color(0xFF2563EB), Color(0xFF1E3A8A)],
     [Color(0xFF16A34A), Color(0xFF14532D)],
@@ -118,33 +50,108 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
 
   final TextEditingController _searchController = TextEditingController();
 
-  List<PastPaper> _papers = List.of(_dummyPastPapers);
+  List<PastPaper> _papers = [];
+  bool _isLoading = true;
+  String? _error;
+
   String _selectedLevel = 'All Levels';
   String _selectedSubject = 'All Subjects';
   int _currentPage = 1;
 
+  @override
+  void initState() {
+    super.initState();
+    _fetchPapers();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // 🔥 DUMMY DATA LOADER (replace later with API)
+  Future<void> _fetchPapers() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    await Future.delayed(const Duration(seconds: 1));
+
+    try {
+      final papers = [
+        PastPaper(
+          id: '1',
+          title: 'Mathematics Final Exam 2023',
+          subject: 'Mathematics',
+          classLevel: 'Form 4',
+          targetAudience: 'Students',
+          description: 'Final exam paper with marking scheme.',
+          fileUrl: 'https://example.com/math.pdf',
+          createdAt: DateTime.now().subtract(const Duration(days: 10)),
+          uploaderName: 'Admin',
+        ),
+        PastPaper(
+          id: '2',
+          title: 'Biology Mock Paper',
+          subject: 'Biology',
+          classLevel: 'Form 3',
+          description: 'Practice paper for revision.',
+          fileUrl: 'https://example.com/bio.pdf',
+          createdAt: DateTime.now().subtract(const Duration(days: 5)),
+          uploaderName: 'Teacher John',
+        ),
+        PastPaper(
+          id: '3',
+          title: 'English Past Paper',
+          subject: 'English',
+          classLevel: 'Form 2',
+          description: 'Comprehension and grammar.',
+          fileUrl: '',
+          createdAt: DateTime.now(),
+          uploaderName: 'Admin',
+        ),
+      ];
+
+      if (!mounted) return;
+
+      setState(() {
+        _papers = papers;
+        _currentPage = 1;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // 🔥 FILTERING
   List<String> get _subjects {
-    final subjects =
-        _papers
-            .map((paper) => paper.subject)
-            .whereType<String>()
-            .where((subject) => subject.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort();
+    final subjects = _papers
+        .map((p) => p.subject)
+        .whereType<String>()
+        .toSet()
+        .toList()
+      ..sort();
     return ['All Subjects', ...subjects];
   }
 
   List<PastPaper> get _filteredPapers {
-    final query = _searchController.text.trim().toLowerCase();
+    final query = _searchController.text.toLowerCase();
 
     return _papers.where((paper) {
       final matchesSearch =
           query.isEmpty ||
           paper.title.toLowerCase().contains(query) ||
           (paper.description?.toLowerCase().contains(query) ?? false);
+
       final matchesLevel =
-          _selectedLevel == 'All Levels' || paper.classLevel == _selectedLevel;
+          _selectedLevel == 'All Levels' ||
+          paper.classLevel == _selectedLevel;
+
       final matchesSubject =
           _selectedSubject == 'All Subjects' ||
           paper.subject == _selectedSubject;
@@ -155,7 +162,7 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
 
   int get _totalPages {
     final pages = (_filteredPapers.length / _itemsPerPage).ceil();
-    return pages < 1 ? 1 : pages;
+    return pages == 0 ? 1 : pages;
   }
 
   List<PastPaper> get _currentPapers {
@@ -163,36 +170,9 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
     return _filteredPapers.skip(start).take(_itemsPerPage).toList();
   }
 
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _refreshPapers() async {
-    setState(() {
-      _papers = List.of(_dummyPastPapers);
-      _currentPage = 1;
-    });
-  }
-
-  Future<void> _previewPaper(PastPaper paper) async {
-    if (!mounted) return;
-    _showFileMessage(paper, 'Preview');
-  }
-
-  Future<void> _downloadPaper(PastPaper paper) async {
-    if (!mounted) return;
-    _showFileMessage(paper, 'Download');
-  }
-
   void _showFileMessage(PastPaper paper, String action) {
     final fileUrl = paper.fileUrl;
+
     final message = fileUrl == null || fileUrl.isEmpty
         ? 'No file URL available for ${paper.title}'
         : '$action link copied: $fileUrl';
@@ -202,8 +182,16 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 4)),
+      SnackBar(content: Text(message)),
     );
+  }
+
+  Future<void> _previewPaper(PastPaper paper) async {
+    _showFileMessage(paper, 'Preview');
+  }
+
+  Future<void> _downloadPaper(PastPaper paper) async {
+    _showFileMessage(paper, 'Download');
   }
 
   void _resetFilters() {
@@ -224,217 +212,90 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
 
   String _formatDate(DateTime? date) {
     if (date == null) return '';
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${date.day} ${months[date.month - 1]} ${date.year}';
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredPapers;
-    final startItem = filtered.isEmpty
-        ? 0
-        : ((_currentPage - 1) * _itemsPerPage) + 1;
-    final endItem = filtered.isEmpty
-        ? 0
-        : (startItem + _currentPapers.length - 1);
 
-    return RefreshIndicator(
-      onRefresh: _refreshPapers,
-      color: AppColors.primary,
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(child: _buildFilters()),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Showing $startItem-$endItem of ${filtered.length} past papers',
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_currentPapers.isEmpty)
-            SliverFillRemaining(child: _buildEmptyState())
-          else
-            SliverList.separated(
-              itemCount: _currentPapers.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final paper = _currentPapers[index];
-                return Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    index == 0 ? 4 : 0,
-                    16,
-                    index == _currentPapers.length - 1 ? 12 : 0,
-                  ),
-                  child: _PastPaperCard(
+    return Scaffold(
+      appBar: AppBar(title: const Text('Past Papers')),
+      body: RefreshIndicator(
+        onRefresh: _fetchPapers,
+        child: ListView(
+          children: [
+            _buildFilters(),
+            if (_isLoading)
+              const Center(child: Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(),
+              ))
+            else if (_currentPapers.isEmpty)
+              const Center(child: Padding(
+                padding: EdgeInsets.all(20),
+                child: Text('No past papers found'),
+              ))
+            else
+              ..._currentPapers.map((paper) => _PastPaperCard(
                     paper: paper,
-                    gradient: _paperGradients[index % _paperGradients.length],
+                    gradient: _paperGradients[
+                        _currentPapers.indexOf(paper) %
+                            _paperGradients.length],
                     formattedDate: _formatDate(paper.createdAt),
                     onPreview: () => _previewPaper(paper),
                     onDownload: () => _downloadPaper(paper),
-                  ),
-                );
-              },
-            ),
-          if (filtered.isNotEmpty)
-            SliverToBoxAdapter(child: _buildPagination()),
-        ],
+                  )),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildFilters() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
+    return Padding(
+      padding: const EdgeInsets.all(12),
       child: Column(
         children: [
           TextField(
             controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search past papers...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchController.text.isEmpty
-                  ? null
-                  : IconButton(
-                      tooltip: 'Clear search',
-                      icon: const Icon(Icons.close),
-                      onPressed: () =>
-                          _onFilterChanged(_searchController.clear),
-                    ),
+            decoration: const InputDecoration(
+              hintText: 'Search...',
+              prefixIcon: Icon(Icons.search),
             ),
             onChanged: (_) => _onFilterChanged(() {}),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
                   initialValue: _selectedLevel,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Level',
-                    prefixIcon: Icon(Icons.school_outlined),
-                  ),
                   items: const [
                     'All Levels',
                     'Form 1',
                     'Form 2',
                     'Form 3',
                     'Form 4',
-                  ].map(_dropdownItem).toList(),
-                  onChanged: (value) => _onFilterChanged(
-                    () => _selectedLevel = value ?? 'All Levels',
-                  ),
+                  ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                  onChanged: (v) =>
+                      _onFilterChanged(() => _selectedLevel = v!),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  initialValue: _subjects.contains(_selectedSubject)
-                      ? _selectedSubject
-                      : 'All Subjects',
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Subject',
-                    prefixIcon: Icon(Icons.category_outlined),
-                  ),
-                  items: _subjects.map(_dropdownItem).toList(),
-                  onChanged: (value) => _onFilterChanged(
-                    () => _selectedSubject = value ?? 'All Subjects',
-                  ),
+                  initialValue: _selectedSubject,
+                  items: _subjects
+                      .map((e) =>
+                          DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (v) =>
+                      _onFilterChanged(() => _selectedSubject = v!),
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  DropdownMenuItem<String> _dropdownItem(String value) {
-    return DropdownMenuItem(
-      value: value,
-      child: Text(value, overflow: TextOverflow.ellipsis),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.search_off, size: 64, color: AppColors.text2),
-          const SizedBox(height: 16),
-          const Text(
-            'No past papers found',
-            style: TextStyle(fontSize: 18, color: AppColors.text2),
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: _resetFilters,
-            child: const Text('Clear filters'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPagination() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton.outlined(
-            tooltip: 'Previous page',
-            onPressed: _currentPage == 1
-                ? null
-                : () => setState(() => _currentPage--),
-            icon: const Icon(Icons.chevron_left),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            'Page $_currentPage of $_totalPages',
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(width: 12),
-          IconButton.outlined(
-            tooltip: 'Next page',
-            onPressed: _currentPage == _totalPages
-                ? null
-                : () => setState(() => _currentPage++),
-            icon: const Icon(Icons.chevron_right),
-          ),
+          )
         ],
       ),
     );
@@ -459,154 +320,37 @@ class _PastPaperCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: EdgeInsets.zero,
+      margin: const EdgeInsets.all(10),
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
+        padding: const EdgeInsets.all(12),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              clipBehavior: Clip.none,
+            Text(paper.title,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            if (formattedDate.isNotEmpty) Text(formattedDate),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
               children: [
-                Container(
-                  width: 58,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: gradient,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.description_outlined,
-                    color: Colors.white54,
-                    size: 30,
-                  ),
-                ),
-                Positioned(
-                  top: -5,
-                  right: -5,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.download,
-                      color: Colors.white,
-                      size: 13,
-                    ),
-                  ),
-                ),
+                if (paper.subject != null) Chip(label: Text(paper.subject!)),
+                if (paper.classLevel != null)
+                  Chip(label: Text(paper.classLevel!)),
               ],
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    paper.title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (_metaLine.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      _metaLine,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.text2,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 6,
-                    children: [
-                      if (paper.subject != null)
-                        _InfoChip(
-                          label: paper.subject!,
-                          color: AppColors.primary,
-                        ),
-                      if (paper.classLevel != null)
-                        _InfoChip(label: paper.classLevel!),
-                      if (paper.targetAudience != null)
-                        _InfoChip(label: paper.targetAudience!),
-                    ],
-                  ),
-                  if (paper.description != null &&
-                      paper.description!.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      paper.description!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.text2,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: onPreview,
-                          icon: const Icon(Icons.visibility_outlined, size: 18),
-                          label: const Text('Preview'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: onDownload,
-                          icon: const Icon(Icons.download, size: 18),
-                          label: const Text('Download'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                ElevatedButton(
+                    onPressed: onPreview, child: const Text('Preview')),
+                const SizedBox(width: 10),
+                OutlinedButton(
+                    onPressed: onDownload, child: const Text('Download')),
+              ],
+            )
           ],
         ),
-      ),
-    );
-  }
-
-  String get _metaLine {
-    final parts = <String>[
-      if (paper.uploaderName != null && paper.uploaderName!.isNotEmpty)
-        'Uploaded by ${paper.uploaderName}',
-      if (formattedDate.isNotEmpty) formattedDate,
-    ];
-    return parts.join(' - ');
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _InfoChip({required this.label, this.color = AppColors.text2});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: TextStyle(
-        color: color,
-        fontSize: 12,
-        fontWeight: color == AppColors.primary ? FontWeight.w700 : null,
       ),
     );
   }
