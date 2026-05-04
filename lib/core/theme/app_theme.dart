@@ -10,6 +10,9 @@ class AppColors {
   static const Color text2 = Color(0xFFA9BED6);
   static const Color border = Color(0xFF234465);
   static const Color accent4 = Color(0xFFFF6B6B);
+  static const Color success = Color(0xFF4CAF50);
+  static const Color warning = Color(0xFFFF9800);
+  static const Color error = Color(0xFFF44336);
 }
 
 class AppTheme {
