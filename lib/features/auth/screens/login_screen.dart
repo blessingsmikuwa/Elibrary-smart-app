@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../student/screens/student_home_screen.dart';
 import '../../teacher/screens/teacher_home_screen.dart';
 
@@ -120,6 +122,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
+    if (!result["success"]) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Login failed")));
+      return;
+    }
+
+    final role = result["role"];
       final role = (user['role'] as String).toUpperCase();
 
       if (role == 'STUDENT') {
@@ -166,8 +176,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   'eLibrary',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 10),
 
@@ -175,9 +185,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: AppColors.surface,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Column(
                     children: [
@@ -301,15 +311,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          'Login as ${_selectedRole == UserRole.student ? "Student" : "Teacher"}',
-                          style: const TextStyle(fontSize: 15),
-                        ),
+                      ? const CircularProgressIndicator()
+                      : const Text("Login"),
+                ),
+
+                const SizedBox(height: 16),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Need an account? '),
+                    TextButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SignupScreen(),
+                                ),
+                              );
+                            },
+                      child: const Text('Sign up'),
+                    ),
+                  ],
                 ),
               ],
             ),
