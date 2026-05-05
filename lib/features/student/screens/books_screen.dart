@@ -277,7 +277,7 @@ class _BooksScreenState extends State<BooksScreen> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedClass,
+                  initialValue: _selectedClass,
                   isDense: true,
                   decoration: InputDecoration(
                     labelText: 'Class',
@@ -302,7 +302,7 @@ class _BooksScreenState extends State<BooksScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedSubject,
+                  initialValue: _selectedSubject,
                   isDense: true,
                   decoration: InputDecoration(
                     labelText: 'Subject',
