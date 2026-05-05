@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_theme.dart';
 
 class TeacherHomeScreen extends StatelessWidget {
   const TeacherHomeScreen({super.key});
@@ -8,18 +9,14 @@ class TeacherHomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Teacher Dashboard'),
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.surface,
+        foregroundColor: AppColors.text,
       ),
       body: const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.person,
-              size: 80,
-              color: Colors.green,
-            ),
+            Icon(Icons.person, size: 80, color: AppColors.primary),
             SizedBox(height: 16),
             Text(
               'Welcome Teacher!',
@@ -28,7 +25,7 @@ class TeacherHomeScreen extends StatelessWidget {
             SizedBox(height: 8),
             Text(
               'You are logged in as a teacher',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+              style: TextStyle(fontSize: 16, color: AppColors.text2),
             ),
           ],
         ),
