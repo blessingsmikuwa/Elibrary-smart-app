@@ -14,7 +14,7 @@ void main() {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const ELibraryApp());
 
-    // Verify that the app title is displayed.
-    expect(find.text('eLibrary Mobile App'), findsOneWidget);
+    // Verify that the student dashboard is displayed.
+    expect(find.text('Welcome back, Student!'), findsOneWidget);
   });
 }

@@ -86,13 +86,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icons.lock_reset_rounded,
                 title: 'Change password',
                 subtitle: 'Keep your account secure',
-                onTap: () => _showMessage('Password change will be added soon.'),
+                onTap: () =>
+                    _showMessage('Password change will be added soon.'),
               ),
               _ActionTile(
                 icon: Icons.devices_rounded,
                 title: 'Manage login session',
                 subtitle: 'Review signed-in devices later',
-                onTap: () => _showMessage('Session management will be added soon.'),
+                onTap: () =>
+                    _showMessage('Session management will be added soon.'),
               ),
               _ActionTile(
                 icon: Icons.logout_rounded,
@@ -147,8 +149,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: 'Save activity history',
                 subtitle: 'Keep recent downloads, views, and quiz activity',
                 value: _activityHistory,
-                onChanged: (value) =>
-                    setState(() => _activityHistory = value),
+                onChanged: (value) => setState(() => _activityHistory = value),
               ),
               _SwitchTile(
                 icon: Icons.cloud_download_rounded,
@@ -181,7 +182,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icons.support_agent_rounded,
                 title: 'Contact support',
                 subtitle: 'Ask an admin or teacher for help',
-                onTap: () => _showMessage('Support contact will be added soon.'),
+                onTap: () =>
+                    _showMessage('Support contact will be added soon.'),
               ),
               _ActionTile(
                 icon: Icons.report_problem_rounded,
@@ -202,9 +204,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _confirmLogout() async {
@@ -212,10 +214,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: _surfaceColor,
-        title: const Text(
-          'Logout?',
-          style: TextStyle(color: _textColor),
-        ),
+        title: const Text('Logout?', style: TextStyle(color: _textColor)),
         content: const Text(
           'You will return to the login screen once authentication is connected.',
           style: TextStyle(color: _mutedTextColor),
@@ -227,10 +226,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text(
-              'Logout',
-              style: TextStyle(color: _dangerColor),
-            ),
+            child: const Text('Logout', style: TextStyle(color: _dangerColor)),
           ),
         ],
       ),
@@ -301,11 +297,7 @@ class _ProfileHeader extends StatelessWidget {
           CircleAvatar(
             radius: 28,
             backgroundColor: _SettingsScreenState._primaryColor,
-            child: Icon(
-              Icons.person_rounded,
-              color: Colors.white,
-              size: 30,
-            ),
+            child: Icon(Icons.person_rounded, color: Colors.white, size: 30),
           ),
           SizedBox(width: 14),
           Expanded(
@@ -414,7 +406,7 @@ class _SwitchTile extends StatelessWidget {
         style: const TextStyle(color: _SettingsScreenState._subtleTextColor),
       ),
       value: value,
-      activeColor: _SettingsScreenState._primaryColor,
+      activeThumbColor: _SettingsScreenState._primaryColor,
       onChanged: onChanged,
     );
   }

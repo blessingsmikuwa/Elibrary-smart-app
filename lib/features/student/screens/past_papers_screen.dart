@@ -1,7 +1,5 @@
- import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-import '../../../core/theme/app_theme.dart';
 
 class PastPaper {
   final String id;
@@ -130,12 +128,9 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
 
   // 🔥 FILTERING
   List<String> get _subjects {
-    final subjects = _papers
-        .map((p) => p.subject)
-        .whereType<String>()
-        .toSet()
-        .toList()
-      ..sort();
+    final subjects =
+        _papers.map((p) => p.subject).whereType<String>().toSet().toList()
+          ..sort();
     return ['All Subjects', ...subjects];
   }
 
@@ -149,8 +144,7 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
           (paper.description?.toLowerCase().contains(query) ?? false);
 
       final matchesLevel =
-          _selectedLevel == 'All Levels' ||
-          paper.classLevel == _selectedLevel;
+          _selectedLevel == 'All Levels' || paper.classLevel == _selectedLevel;
 
       final matchesSubject =
           _selectedSubject == 'All Subjects' ||
@@ -158,11 +152,6 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
 
       return matchesSearch && matchesLevel && matchesSubject;
     }).toList();
-  }
-
-  int get _totalPages {
-    final pages = (_filteredPapers.length / _itemsPerPage).ceil();
-    return pages == 0 ? 1 : pages;
   }
 
   List<PastPaper> get _currentPapers {
@@ -181,9 +170,9 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
       Clipboard.setData(ClipboardData(text: fileUrl));
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _previewPaper(PastPaper paper) async {
@@ -192,15 +181,6 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
 
   Future<void> _downloadPaper(PastPaper paper) async {
     _showFileMessage(paper, 'Download');
-  }
-
-  void _resetFilters() {
-    setState(() {
-      _searchController.clear();
-      _selectedLevel = 'All Levels';
-      _selectedSubject = 'All Subjects';
-      _currentPage = 1;
-    });
   }
 
   void _onFilterChanged(VoidCallback update) {
@@ -217,8 +197,6 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filteredPapers;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Past Papers')),
       body: RefreshIndicator(
@@ -226,26 +204,40 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
         child: ListView(
           children: [
             _buildFilters(),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.redAccent),
+                ),
+              ),
             if (_isLoading)
-              const Center(child: Padding(
-                padding: EdgeInsets.all(20),
-                child: CircularProgressIndicator(),
-              ))
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(),
+                ),
+              )
             else if (_currentPapers.isEmpty)
-              const Center(child: Padding(
-                padding: EdgeInsets.all(20),
-                child: Text('No past papers found'),
-              ))
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text('No past papers found'),
+                ),
+              )
             else
-              ..._currentPapers.map((paper) => _PastPaperCard(
-                    paper: paper,
-                    gradient: _paperGradients[
-                        _currentPapers.indexOf(paper) %
-                            _paperGradients.length],
-                    formattedDate: _formatDate(paper.createdAt),
-                    onPreview: () => _previewPaper(paper),
-                    onDownload: () => _downloadPaper(paper),
-                  )),
+              ..._currentPapers.map(
+                (paper) => _PastPaperCard(
+                  paper: paper,
+                  gradient:
+                      _paperGradients[_currentPapers.indexOf(paper) %
+                          _paperGradients.length],
+                  formattedDate: _formatDate(paper.createdAt),
+                  onPreview: () => _previewPaper(paper),
+                  onDownload: () => _downloadPaper(paper),
+                ),
+              ),
           ],
         ),
       ),
@@ -271,15 +263,19 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
               Expanded(
                 child: DropdownButtonFormField<String>(
                   initialValue: _selectedLevel,
-                  items: const [
-                    'All Levels',
-                    'Form 1',
-                    'Form 2',
-                    'Form 3',
-                    'Form 4',
-                  ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                  onChanged: (v) =>
-                      _onFilterChanged(() => _selectedLevel = v!),
+                  items:
+                      const [
+                            'All Levels',
+                            'Form 1',
+                            'Form 2',
+                            'Form 3',
+                            'Form 4',
+                          ]
+                          .map(
+                            (e) => DropdownMenuItem(value: e, child: Text(e)),
+                          )
+                          .toList(),
+                  onChanged: (v) => _onFilterChanged(() => _selectedLevel = v!),
                 ),
               ),
               const SizedBox(width: 10),
@@ -287,15 +283,14 @@ class _PastPapersScreenState extends State<PastPapersScreen> {
                 child: DropdownButtonFormField<String>(
                   initialValue: _selectedSubject,
                   items: _subjects
-                      .map((e) =>
-                          DropdownMenuItem(value: e, child: Text(e)))
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                       .toList(),
                   onChanged: (v) =>
                       _onFilterChanged(() => _selectedSubject = v!),
                 ),
               ),
             ],
-          )
+          ),
         ],
       ),
     );
@@ -326,10 +321,19 @@ class _PastPaperCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(paper.title,
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(
+              paper.title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
             if (formattedDate.isNotEmpty) Text(formattedDate),
+            const SizedBox(height: 10),
+            Container(
+              height: 4,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: gradient),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -343,12 +347,16 @@ class _PastPaperCard extends StatelessWidget {
             Row(
               children: [
                 ElevatedButton(
-                    onPressed: onPreview, child: const Text('Preview')),
+                  onPressed: onPreview,
+                  child: const Text('Preview'),
+                ),
                 const SizedBox(width: 10),
                 OutlinedButton(
-                    onPressed: onDownload, child: const Text('Download')),
+                  onPressed: onDownload,
+                  child: const Text('Download'),
+                ),
               ],
-            )
+            ),
           ],
         ),
       ),

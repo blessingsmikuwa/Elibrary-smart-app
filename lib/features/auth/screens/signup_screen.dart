@@ -548,7 +548,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Widget _buildLevelDropdown() {
     return DropdownButtonFormField<String>(
-      value: _level,
+      initialValue: _level,
       dropdownColor: const Color(0xFF0D1117),
       style: const TextStyle(color: Color(0xFFE6EDF3), fontSize: 14),
       decoration: _fieldDecoration(hintText: 'Level'),
@@ -563,7 +563,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Widget _buildSchoolDropdown() {
     return DropdownButtonFormField<String>(
-      value: _schoolId,
+      initialValue: _schoolId,
       dropdownColor: const Color(0xFF0D1117),
       style: const TextStyle(color: Color(0xFFE6EDF3), fontSize: 14),
       decoration: _fieldDecoration(
