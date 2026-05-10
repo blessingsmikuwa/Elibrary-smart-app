@@ -1,67 +1,87 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_theme.dart';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
-/// Book model - easy to replace with database model
-class Book {
+import 'api_service.dart';
+
+// ─── Model ────────────────────────────────────────────────────────────────────
+
+class _Book {
   final String id;
   final String title;
-  final String subject;
-  final String classLevel;
-  final String docType;
-  final bool isPremium;
-  final double? price; // Price in MWK for premium books
   final String? description;
-  final String? coverUrl;
-  final String? downloadUrl;
+  final String? categoryName;
+  final String? targetClassName;
+  final double price;
+  final String? currency;
+  final bool isPurchased;
+  final String? fileUrl;
 
-  Book({
+  const _Book({
     required this.id,
     required this.title,
-    required this.subject,
-    required this.classLevel,
-    required this.docType,
-    this.isPremium = false,
-    this.price,
     this.description,
-    this.coverUrl,
-    this.downloadUrl,
+    this.categoryName,
+    this.targetClassName,
+    required this.price,
+    this.currency,
+    required this.isPurchased,
+    this.fileUrl,
   });
 
-  // Factory constructor for creating Book from database map
-  factory Book.fromMap(Map<String, dynamic> map) {
-    return Book(
-      id: map['id']?.toString() ?? '',
-      title: map['title'] ?? '',
-      subject: map['subject'] ?? '',
-      classLevel: map['class'] ?? map['classLevel'] ?? '',
-      docType: map['docType'] ?? map['documentType'] ?? '',
-      isPremium: map['isPremium'] ?? map['is_premium'] ?? false,
-      price: map['price']?.toDouble(),
-      description: map['description'],
-      coverUrl: map['coverUrl'] ?? map['cover_url'],
-      downloadUrl: map['downloadUrl'] ?? map['download_url'],
-    );
+  bool get isPaid => price > 0;
+  bool get canAccess => !isPaid || isPurchased;
+
+  String get formattedPrice {
+    if (price <= 0) return 'Free';
+    final cur = currency ?? 'MWK';
+    return '$cur ${price.toStringAsFixed(2)}';
   }
 
-  // Convert Book to map for database operations
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'title': title,
-      'subject': subject,
-      'class': classLevel,
-      'docType': docType,
-      'isPremium': isPremium,
-      'price': price,
-      'description': description,
-      'coverUrl': coverUrl,
-      'downloadUrl': downloadUrl,
-    };
+  factory _Book.fromJson(Map<String, dynamic> json, Set<String> purchasedIds) {
+    double price = 0;
+    final raw = json['price'] ?? json['amount'] ?? json['cost'];
+    if (raw is num) price = raw.toDouble();
+    if (raw is String) price = double.tryParse(raw) ?? 0;
+
+    final purchased = purchasedIds.contains(json['id'] as String? ?? '') ||
+        json['purchased'] == true ||
+        json['isPurchased'] == true ||
+        json['hasAccess'] == true;
+
+    return _Book(
+      id:              json['id']?.toString() ?? '',
+      title:           json['title']?.toString() ?? 'Untitled',
+      description:     json['description']?.toString(),
+      categoryName:    (json['category'] as Map<String, dynamic>?)?['name']?.toString(),
+      targetClassName: (json['targetClass'] as Map<String, dynamic>?)?['name']?.toString(),
+      price:           price,
+      currency:        json['currency']?.toString(),
+      isPurchased:     purchased,
+      fileUrl:         json['fileUrl']?.toString(),
+    );
   }
 }
 
-/// Enum for book type selection
-enum BookType { free, premium }
+// ─── Icons by subject ─────────────────────────────────────────────────────────
+
+const _subjectIcons = <String, IconData>{
+  'Mathematics': Icons.calculate,
+  'Biology':     Icons.biotech,
+  'Chemistry':   Icons.science,
+  'Physics':     Icons.electric_bolt,
+  'English':     Icons.menu_book,
+  'History':     Icons.history_edu,
+  'Geography':   Icons.public,
+};
+
+IconData _iconFor(String? subject) =>
+    _subjectIcons[subject ?? ''] ?? Icons.menu_book;
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
+enum _BookType { free, premium }
 
 class BooksScreen extends StatefulWidget {
   const BooksScreen({super.key});
@@ -71,575 +91,514 @@ class BooksScreen extends StatefulWidget {
 }
 
 class _BooksScreenState extends State<BooksScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  String _selectedClass = 'All';
-  String _selectedSubject = 'All';
-  BookType _selectedBookType = BookType.free;
+  static const _primary = Color(0xFF2EA043);
+  static const _surface = Color(0xFF161B22);
+  static const _bg      = Color(0xFF0D1117);
+  static const _border  = Color(0xFF21262D);
+  static const _text    = Color(0xFFE6EDF3);
+  static const _muted   = Color(0xFF8B949E);
+  static const _subtle  = Color(0xFF6E7681);
 
-  // ============================================================
-  // DUMMY DATA - Replace this with database API call
-  // Example replacement:
-  // final List<Book> _allBooks = await BookRepository.getBooks();
-  // ============================================================
-  final List<Book> _allBooks = [
-    // Free Books
-    Book(
-      id: '1',
-      title: 'Mathematics Form 1',
-      subject: 'Mathematics',
-      classLevel: 'Form 1',
-      docType: 'Textbook',
-      isPremium: false,
-    ),
-    Book(
-      id: '2',
-      title: 'Physics Form 2',
-      subject: 'Physics',
-      classLevel: 'Form 2',
-      docType: 'Textbook',
-      isPremium: false,
-    ),
-    Book(
-      id: '3',
-      title: 'Chemistry Form 3',
-      subject: 'Chemistry',
-      classLevel: 'Form 3',
-      docType: 'Textbook',
-      isPremium: false,
-    ),
-    Book(
-      id: '4',
-      title: 'Biology Form 4',
-      subject: 'Biology',
-      classLevel: 'Form 4',
-      docType: 'Textbook',
-      isPremium: false,
-    ),
-    Book(
-      id: '5',
-      title: 'English Grammar',
-      subject: 'English',
-      classLevel: 'Form 1',
-      docType: 'Guide',
-      isPremium: false,
-    ),
-    Book(
-      id: '6',
-      title: 'History Notes',
-      subject: 'History',
-      classLevel: 'Form 2',
-      docType: 'Notes',
-      isPremium: false,
-    ),
-    Book(
-      id: '7',
-      title: 'Geography Form 3',
-      subject: 'Geography',
-      classLevel: 'Form 3',
-      docType: 'Textbook',
-      isPremium: false,
-    ),
-    Book(
-      id: '8',
-      title: 'Mathematics Form 2',
-      subject: 'Mathematics',
-      classLevel: 'Form 2',
-      docType: 'Guide',
-      isPremium: false,
-    ),
-    Book(
-      id: '9',
-      title: 'Physics Form 1',
-      subject: 'Physics',
-      classLevel: 'Form 1',
-      docType: 'Notes',
-      isPremium: false,
-    ),
-    Book(
-      id: '10',
-      title: 'Chemistry Form 4',
-      subject: 'Chemistry',
-      classLevel: 'Form 4',
-      docType: 'Textbook',
-      isPremium: false,
-    ),
-    // Premium Books
-    Book(
-      id: '11',
-      title: 'Advanced Mathematics',
-      subject: 'Mathematics',
-      classLevel: 'Form 4',
-      docType: 'Textbook',
-      isPremium: true,
-      price: 500.00,
-    ),
-    Book(
-      id: '12',
-      title: 'Premium Physics Pack',
-      subject: 'Physics',
-      classLevel: 'Form 3',
-      docType: 'Guide',
-      isPremium: true,
-      price: 750.00,
-    ),
-    Book(
-      id: '13',
-      title: 'Chemistry Masterclass',
-      subject: 'Chemistry',
-      classLevel: 'Form 4',
-      docType: 'Textbook',
-      isPremium: true,
-      price: 600.00,
-    ),
-    Book(
-      id: '14',
-      title: 'Biology Complete Notes',
-      subject: 'Biology',
-      classLevel: 'Form 3',
-      docType: 'Notes',
-      isPremium: true,
-      price: 450.00,
-    ),
-    Book(
-      id: '15',
-      title: 'English Literature Premium',
-      subject: 'English',
-      classLevel: 'Form 4',
-      docType: 'Guide',
-      isPremium: true,
-      price: 550.00,
-    ),
-  ];
+  List<_Book> _books        = [];
+  bool        _loading      = true;
+  String?     _error;
+  bool        _purchasing   = false;
 
-  // Filter options - these can also come from database
-  List<String> get _classes => ['All', 'Form 1', 'Form 2', 'Form 3', 'Form 4'];
-  List<String> get _subjects => [
-    'All',
-    'Mathematics',
-    'Physics',
-    'Chemistry',
-    'Biology',
-    'English',
-    'History',
-    'Geography',
-  ];
+  _BookType   _bookType     = _BookType.free;
+  String      _search       = '';
+  String      _level        = 'All Levels';
+  String      _subject      = 'All Subjects';
+  int         _page         = 1;
+  static const _perPage = 12;
 
-  // Filtered books based on search and filter criteria
-  List<Book> get _filteredBooks {
-    return _allBooks.where((book) {
-      // Filter by book type (free or premium)
-      final matchesBookType = _selectedBookType == BookType.free
-          ? !book.isPremium
-          : book.isPremium;
-      final matchesSearch =
-          _searchController.text.isEmpty ||
-          book.title.toLowerCase().contains(
-            _searchController.text.toLowerCase(),
-          ) ||
-          book.subject.toLowerCase().contains(
-            _searchController.text.toLowerCase(),
-          );
-      final matchesClass =
-          _selectedClass == 'All' || book.classLevel == _selectedClass;
-      final matchesSubject =
-          _selectedSubject == 'All' || book.subject == _selectedSubject;
-      return matchesBookType && matchesSearch && matchesClass && matchesSubject;
-    }).toList();
-  }
+  final _searchCtrl = TextEditingController();
 
-  // ============================================================
-  // PAYMENT INTEGRATION
-  // Replace this with actual payment API integration
-  // Example: Flutterwave, PayPal, Stripe, etc.
-  // ============================================================
-  Future<void> _processPayment(Book book) async {
-    // Show payment dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Purchase Premium Book'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Title: ${book.title}'),
-            const SizedBox(height: 8),
-            Text('Price: MWK ${book.price?.toStringAsFixed(2) ?? "0.00"}'),
-            const SizedBox(height: 16),
-            const Text(
-              'This will process payment through the integrated payment API.',
-              style: TextStyle(fontSize: 12, color: AppColors.text2),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Pay Now'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      // Integrate with a payment API when payments are available.
-      // Example with Flutterwave:
-      // await PaymentService.initializePayment(
-      //   amount: book.price!,
-      //   currency: 'MWK',
-      //   bookId: book.id,
-      // );
-
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Payment successful! You can now access ${book.title}',
-            ),
-            backgroundColor: AppColors.primary,
-          ),
-        );
-      }
-    }
-  }
-
-  void _readBook(Book book) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Opening ${book.title} for reading...')),
-    );
-  }
-
-  void _downloadBook(Book book) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Downloading ${book.title}...')));
+  @override
+  void initState() {
+    super.initState();
+    _fetchAll();
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
+  Future<void> _fetchAll() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final headers = await authHeaders();
+
+      // Fetch resources
+      final res = await http.get(
+        Uri.parse('$kApiBase/resources'),
+        headers: headers,
+      );
+      if (res.statusCode != 200) throw Exception('Failed to load resources');
+
+      final body = jsonDecode(res.body);
+      final rawList = body is Map ? (body['data'] as List?) ?? [] : body as List;
+
+      // Only DOCUMENT type
+      final all = (rawList as List<dynamic>)
+          .where((e) => (e as Map<String, dynamic>)['form'] == 'DOCUMENT')
+          .toList();
+
+      // Fetch purchases
+      Set<String> purchased = {};
+      try {
+        final pr = await http.get(
+          Uri.parse('$kApiBase/payment/my-purchases'),
+          headers: headers,
+        );
+        if (pr.statusCode == 200) {
+          final pd = jsonDecode(pr.body) as Map<String, dynamic>;
+          purchased = Set<String>.from(pd['purchased'] as List? ?? []);
+        }
+      } catch (_) {}
+
+      if (!mounted) return;
+      setState(() {
+        _books = all
+            .map((e) => _Book.fromJson(e as Map<String, dynamic>, purchased))
+            .toList();
+      });
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _logActivity(String action, String title) async {
+    try {
+      final headers = await authHeaders();
+      await http.post(
+        Uri.parse('$kApiBase/activity'),
+        headers: headers,
+        body: jsonEncode({'action': action, 'resourceTitle': title}),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _openUrl(String? url, String action, String title) async {
+    if (url == null || url.isEmpty) {
+      _snack('No file available for "$title"');
+      return;
+    }
+    await _logActivity(action, title);
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      _snack('Could not open file');
+    }
+  }
+
+  Future<void> _purchase(_Book book) async {
+    setState(() { _purchasing = true; _error = null; });
+    try {
+      final headers = await authHeaders();
+      final res = await http.post(
+        Uri.parse('$kApiBase/payment/create-checkout-session'),
+        headers: headers,
+        body: jsonEncode({'resourceId': book.id, 'amount': book.price}),
+      );
+      if (res.statusCode != 200) {
+        final d = jsonDecode(res.body) as Map<String, dynamic>;
+        throw Exception(d['message']?.toString() ?? 'Payment failed');
+      }
+      final d = jsonDecode(res.body) as Map<String, dynamic>;
+      final url = d['checkoutUrl']?.toString() ?? d['url']?.toString();
+      if (url != null) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('No checkout URL returned');
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _purchasing = false);
+    }
+  }
+
+  void _snack(String msg) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+
+  // ── Filtering ──────────────────────────────────────────────────────────────
+
+  List<String> get _subjects {
+    final s = _books.map((b) => b.categoryName).whereType<String>().toSet().toList()..sort();
+    return ['All Subjects', ...s];
+  }
+
+  List<_Book> get _filtered => _books.where((b) {
+    final matchType    = _bookType == _BookType.free ? !b.isPaid : b.isPaid;
+    final matchSearch  = _search.isEmpty ||
+        b.title.toLowerCase().contains(_search.toLowerCase()) ||
+        (b.description?.toLowerCase().contains(_search.toLowerCase()) ?? false);
+    final matchLevel   = _level   == 'All Levels'   || b.targetClassName == _level;
+    final matchSubject = _subject == 'All Subjects'  || b.categoryName   == _subject;
+    return matchType && matchSearch && matchLevel && matchSubject;
+  }).toList();
+
+  List<_Book> get _paginated {
+    final start = (_page - 1) * _perPage;
+    return _filtered.skip(start).take(_perPage).toList();
+  }
+
+  int get _totalPages => (_filtered.length / _perPage).ceil().clamp(1, 9999);
+
+  void _resetPage() => setState(() => _page = 1);
+
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Book Type Selection (Free/Premium)
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: Border(bottom: BorderSide(color: AppColors.border)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Select Book Type',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              Row(
+    return Scaffold(
+      backgroundColor: _bg,
+      body: RefreshIndicator(
+        color: _primary,
+        onRefresh: _fetchAll,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator(color: _primary))
+            : ListView(
+                padding: const EdgeInsets.all(16),
                 children: [
-                  Expanded(
-                    child: _buildBookTypeButton(
-                      title: 'Free Books',
-                      icon: Icons.book_outlined,
-                      isSelected: _selectedBookType == BookType.free,
-                      onTap: () =>
-                          setState(() => _selectedBookType = BookType.free),
+                  // Book type toggle
+                  _buildTypeToggle(),
+                  const SizedBox(height: 12),
+
+                  // Error
+                  if (_error != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3D1A1A),
+                        border: Border.all(color: const Color(0xFFF85149)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(_error!, style: const TextStyle(color: Color(0xFFF85149))),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildBookTypeButton(
-                      title: 'Premium',
-                      icon: Icons.star,
-                      isSelected: _selectedBookType == BookType.premium,
-                      onTap: () =>
-                          setState(() => _selectedBookType = BookType.premium),
-                      isPremium: true,
+
+                  // Search
+                  TextField(
+                    controller: _searchCtrl,
+                    style: const TextStyle(color: _text),
+                    decoration: InputDecoration(
+                      hintText: 'Search books...',
+                      hintStyle: const TextStyle(color: _subtle),
+                      prefixIcon: const Icon(Icons.search, color: _muted),
+                      filled: true,
+                      fillColor: _surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: _border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: _border),
+                      ),
                     ),
+                    onChanged: (v) { _search = v; _resetPage(); },
                   ),
+                  const SizedBox(height: 10),
+
+                  // Filters
+                  Row(children: [
+                    Expanded(child: _buildDropdown(
+                      value: _level,
+                      items: const ['All Levels', 'Form 1', 'Form 2', 'Form 3', 'Form 4'],
+                      label: 'Level',
+                      onChanged: (v) { setState(() => _level = v!); _resetPage(); },
+                    )),
+                    const SizedBox(width: 10),
+                    Expanded(child: _buildDropdown(
+                      value: _subject,
+                      items: _subjects,
+                      label: 'Subject',
+                      onChanged: (v) { setState(() => _subject = v!); _resetPage(); },
+                    )),
+                  ]),
+                  const SizedBox(height: 16),
+
+                  // Count
+                  Text(
+                    '${_bookType == _BookType.free ? "Free" : "Premium"} Books  •  ${_filtered.length} results',
+                    style: const TextStyle(color: _muted, fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Books list
+                  if (_paginated.isEmpty)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Text('No books found.', style: TextStyle(color: _subtle)),
+                      ),
+                    )
+                  else
+                    ...(_paginated.map(_buildBookCard)),
+
+                  // Pagination
+                  if (_totalPages > 1) _buildPagination(),
                 ],
               ),
-            ],
-          ),
-        ),
-
-        // Search Bar
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search for a book...',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              filled: true,
-              fillColor: AppColors.surface2,
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
-        ),
-
-        // Compact Filter Bar
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: Border(bottom: BorderSide(color: AppColors.border)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedClass,
-                  isDense: true,
-                  decoration: InputDecoration(
-                    labelText: 'Class',
-                    prefixIcon: const Icon(Icons.school_outlined, size: 20),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                  ),
-                  items: _classes.map((classItem) {
-                    return DropdownMenuItem(
-                      value: classItem,
-                      child: Text(classItem),
-                    );
-                  }).toList(),
-                  onChanged: (val) => setState(() => _selectedClass = val!),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedSubject,
-                  isDense: true,
-                  decoration: InputDecoration(
-                    labelText: 'Subject',
-                    prefixIcon: const Icon(Icons.category_outlined, size: 20),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                  ),
-                  items: _subjects.map((subjectItem) {
-                    return DropdownMenuItem(
-                      value: subjectItem,
-                      child: Text(subjectItem, overflow: TextOverflow.ellipsis),
-                    );
-                  }).toList(),
-                  onChanged: (val) => setState(() => _selectedSubject = val!),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 8),
-
-        // Books List
-        Expanded(
-          child: _filteredBooks.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_off, size: 64, color: AppColors.text2),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No books found',
-                        style: TextStyle(fontSize: 18, color: AppColors.text2),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _filteredBooks.length,
-                  itemBuilder: (context, index) {
-                    final book = _filteredBooks[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      elevation: 2,
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(16),
-                        leading: Stack(
-                          children: [
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: book.isPremium
-                                    ? Colors.amber.withValues(alpha: 0.2)
-                                    : AppColors.primary.withValues(alpha: 0.14),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                Icons.menu_book,
-                                color: book.isPremium
-                                    ? Colors.amber[700]
-                                    : AppColors.primary,
-                              ),
-                            ),
-                            if (book.isPremium)
-                              const Positioned(
-                                right: -5,
-                                top: -5,
-                                child: Icon(
-                                  Icons.star,
-                                  size: 16,
-                                  color: Colors.amber,
-                                ),
-                              ),
-                          ],
-                        ),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                book.title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            if (book.isPremium)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  'MWK ${book.price?.toStringAsFixed(0)}',
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.background,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        subtitle: Text(
-                          '${book.subject} - ${book.classLevel} - ${book.docType}',
-                          style: TextStyle(
-                            color: AppColors.text2,
-                            fontSize: 12,
-                          ),
-                        ),
-                        trailing: book.isPremium
-                            ? IconButton(
-                                tooltip: 'Purchase',
-                                icon: const Icon(
-                                  Icons.lock,
-                                  color: Colors.amber,
-                                ),
-                                onPressed: () => _processPayment(book),
-                              )
-                            : Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  TextButton(
-                                    onPressed: () => _readBook(book),
-                                    child: const Text(
-                                      'Read',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'Download',
-                                    icon: const Icon(
-                                      Icons.download,
-                                      color: AppColors.primary,
-                                    ),
-                                    onPressed: () => _downloadBook(book),
-                                  ),
-                                ],
-                              ),
-                        onTap: () {
-                          if (book.isPremium) {
-                            _processPayment(book);
-                          } else {
-                            _readBook(book);
-                          }
-                        },
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ],
+      ),
     );
   }
 
-  // Helper method to build book type selection buttons
-  Widget _buildBookTypeButton({
-    required String title,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-    bool isPremium = false,
+  Widget _buildTypeToggle() {
+    return Row(children: [
+      Expanded(child: _TypeBtn(
+        label: 'Free Books',
+        icon: Icons.book_outlined,
+        selected: _bookType == _BookType.free,
+        onTap: () { setState(() { _bookType = _BookType.free; _page = 1; }); },
+      )),
+      const SizedBox(width: 10),
+      Expanded(child: _TypeBtn(
+        label: 'Premium',
+        icon: Icons.star,
+        selected: _bookType == _BookType.premium,
+        isPremium: true,
+        onTap: () { setState(() { _bookType = _BookType.premium; _page = 1; }); },
+      )),
+    ]);
+  }
+
+  Widget _buildDropdown({
+    required String value,
+    required List<String> items,
+    required String label,
+    required ValueChanged<String?> onChanged,
   }) {
+    return DropdownButtonFormField<String>(
+      value: items.contains(value) ? value : items.first,
+      isExpanded: true,
+      dropdownColor: _surface,
+      style: const TextStyle(color: _text, fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: _muted),
+        filled: true,
+        fillColor: _surface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: _border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: _border),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildBookCard(_Book book) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _surface,
+        border: Border.all(color: _border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(children: [
+        // Icon
+        Container(
+          width: 52, height: 62,
+          decoration: BoxDecoration(
+            color: const Color(0xFF21262D),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(_iconFor(book.categoryName), color: _text, size: 28),
+        ),
+        const SizedBox(width: 14),
+
+        // Info
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(book.title, style: const TextStyle(color: _text, fontWeight: FontWeight.w700, fontSize: 15)),
+            if (book.description != null)
+              Text(
+                book.description!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: _subtle, fontSize: 12),
+              ),
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, children: [
+              if (book.categoryName != null)
+                _Tag(label: book.categoryName!, color: _primary),
+              if (book.targetClassName != null)
+                _Tag(label: book.targetClassName!, outlined: true),
+              _Tag(
+                label: book.isPaid ? 'Paid • ${book.formattedPrice}' : 'Free',
+                color: book.isPaid ? const Color(0xFF2563EB) : _primary,
+              ),
+              if (book.isPurchased && book.isPaid)
+                const _Tag(label: '✓ Purchased', color: Color(0xFF16A34A)),
+            ]),
+          ],
+        )),
+
+        const SizedBox(width: 10),
+
+        // Actions
+        Column(mainAxisSize: MainAxisSize.min, children: [
+          if (book.canAccess) ...[
+            _ActionBtn(
+              label: '📖',
+              color: _primary,
+              onTap: () => _openUrl(book.fileUrl, 'RESOURCE_VIEWED', book.title),
+            ),
+            const SizedBox(height: 6),
+            _ActionBtn(
+              label: '⬇️',
+              color: const Color(0xFF1F6FEB),
+              onTap: () => _openUrl(book.fileUrl, 'DOWNLOAD', book.title),
+            ),
+          ] else
+            _ActionBtn(
+              label: _purchasing ? '...' : 'Buy',
+              color: const Color(0xFF2563EB),
+              onTap: _purchasing ? null : () => _purchase(book),
+              wide: true,
+            ),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _buildPagination() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left),
+          color: _page == 1 ? _subtle : _text,
+          onPressed: _page == 1 ? null : () => setState(() => _page--),
+        ),
+        Text('$_page / $_totalPages', style: const TextStyle(color: _text)),
+        IconButton(
+          icon: const Icon(Icons.chevron_right),
+          color: _page == _totalPages ? _subtle : _text,
+          onPressed: _page == _totalPages ? null : () => setState(() => _page++),
+        ),
+      ]),
+    );
+  }
+}
+
+// ─── Small widgets ────────────────────────────────────────────────────────────
+
+class _TypeBtn extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final bool isPremium;
+  final VoidCallback onTap;
+
+  const _TypeBtn({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+    this.isPremium = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = isPremium ? Colors.amber : const Color(0xFF2EA043);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected
-              ? (isPremium ? Colors.amber : AppColors.primary)
-              : AppColors.surface2,
+          color: selected ? activeColor : const Color(0xFF161B22),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected
-                ? (isPremium ? Colors.amber : AppColors.primary)
-                : AppColors.border,
+            color: selected ? activeColor : const Color(0xFF21262D),
             width: 2,
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? AppColors.background : AppColors.text2,
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, color: selected ? Colors.white : const Color(0xFF8B949E)),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: selected ? Colors.white : const Color(0xFF8B949E),
             ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? AppColors.background : AppColors.text2,
-              ),
-            ),
-          ],
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  final String label;
+  final Color? color;
+  final bool outlined;
+
+  const _Tag({required this.label, this.color, this.outlined = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: outlined ? Colors.transparent : color?.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
+        border: outlined ? Border.all(color: const Color(0xFF21262D)) : null,
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: outlined ? const Color(0xFF6E7681) : (color ?? const Color(0xFF2EA043)),
         ),
+      ),
+    );
+  }
+}
+
+class _ActionBtn extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+  final bool wide;
+
+  const _ActionBtn({
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.wide = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: wide ? 68 : 40,
+        height: 36,
+        decoration: BoxDecoration(
+          color: onTap == null ? color.withValues(alpha: 0.4) : color,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        alignment: Alignment.center,
+        child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 13)),
       ),
     );
   }

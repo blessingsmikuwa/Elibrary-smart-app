@@ -1,11 +1,27 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../core/theme/app_theme.dart';
 import '../../student/screens/student_home_screen.dart';
 import '../../teacher/screens/teacher_home_screen.dart';
-import 'signup_screen.dart';
+import '../screens/signup_screen.dart';
 
+// ─── Constants ───────────────────────────────────────────────────────────────
+const String _kApiBase = String.fromEnvironment(
+  'API_BASE',
+  defaultValue: 'http://127.0.0.1:3000', 
+);
+
+const String _kAccessTokenKey = 'accessToken';
+const String _kRefreshTokenKey = 'refreshToken';
+const String _kUserKey = 'user';
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
 enum UserRole { student, teacher }
 
+// ─── Screen ──────────────────────────────────────────────────────────────────
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -20,8 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _obscurePassword = true;
   bool _isLoading = false;
-
-  // 🔥 NEW: selected role
+  String? _errorMessage;
   UserRole _selectedRole = UserRole.student;
 
   @override
@@ -31,68 +46,116 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<Map<String, dynamic>> _loginUser({
+  // ── API call ────────────────────────────────────────────────────────────────
+  Future<Map<String, dynamic>> _loginWithBackend({
     required String email,
     required String password,
     required UserRole role,
   }) async {
-    setState(() => _isLoading = true);
+    final uri = Uri.parse('$_kApiBase/auth/login');
 
-    try {
-      // Replace this mock delay with a backend API call when it is available.
-      await Future.delayed(const Duration(seconds: 2));
+    final response = await http
+        .post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'email': email, 'password': password}),
+        )
+        .timeout(const Duration(seconds: 15));
 
-      return {
-        "success": true,
-        "role": role == UserRole.student ? "student" : "teacher",
-        "token": "dummy_token_123",
-      };
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode != 200) {
+      final msg = body['message'];
+      throw Exception(
+        msg is String
+            ? msg
+            : msg is List
+                ? msg.join(', ')
+                : 'Login failed',
+      );
     }
+
+    final accessToken = body['accessToken'] as String;
+    final refreshToken = body['refreshToken'] as String;
+    final user = body['user'] as Map<String, dynamic>;
+    final serverRole = (user['role'] as String).toUpperCase();
+
+    // ── Role guards ────────────────────────────────────────────────────────
+    if (serverRole == 'ADMIN') {
+      throw Exception('Admins must use the admin portal.');
+    }
+
+    final expectedRole =
+        role == UserRole.student ? 'STUDENT' : 'TEACHER';
+
+    if (serverRole != expectedRole) {
+      throw Exception(
+        'Incorrect role selected. Please choose the correct account type.',
+      );
+    }
+
+    // ── Persist tokens ─────────────────────────────────────────────────────
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kAccessTokenKey, accessToken);
+    await prefs.setString(_kRefreshTokenKey, refreshToken);
+    await prefs.setString(_kUserKey, jsonEncode(user));
+
+    return user;
   }
 
-  void _handleLogin() async {
+  // ── Login handler ──────────────────────────────────────────────────────────
+  Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final result = await _loginUser(
-      email: _emailController.text.trim(),
-      password: _passwordController.text.trim(),
-      role: _selectedRole,
-    );
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-    if (!mounted) return;
-
-    if (!result["success"]) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Login failed")));
-      return;
-    }
-
-    final role = result["role"];
-
-    if (role == "student") {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const StudentHomeScreen()),
+    try {
+      final user = await _loginWithBackend(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        role: _selectedRole,
       );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const TeacherHomeScreen()),
-      );
+
+      if (!mounted) return;
+
+      final role = (user['role'] as String).toUpperCase();
+
+      if (role == 'STUDENT') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const StudentHomeScreen(),
+          ),
+        );
+      } else if (role == 'TEACHER') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const TeacherHomeScreen(),
+          ),
+        );
+      }
+    } on Exception catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  // ── UI ─────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).primaryColor;
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
             child: Column(
@@ -100,147 +163,104 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const SizedBox(height: 40),
 
-                Icon(
-                  Icons.menu_book_rounded,
-                  size: 80,
-                  color: Theme.of(context).primaryColor,
-                ),
+                Icon(Icons.menu_book_rounded,
+                    size: 80, color: primaryColor),
 
                 const SizedBox(height: 16),
 
                 Text(
                   'eLibrary',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineLarge
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+
+                const SizedBox(height: 20),
+
+                // ── Role selector ─────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Student'),
+                      selected: _selectedRole == UserRole.student,
+                      onSelected: (_) =>
+                          setState(() => _selectedRole = UserRole.student),
+                    ),
+                    const SizedBox(width: 10),
+                    ChoiceChip(
+                      label: const Text('Teacher'),
+                      selected: _selectedRole == UserRole.teacher,
+                      onSelected: (_) =>
+                          setState(() => _selectedRole = UserRole.teacher),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // ── Error ─────────────────────────
+                if (_errorMessage != null)
+                  Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.red),
                   ),
+
+                const SizedBox(height: 10),
+
+                // ── Email ─────────────────────────
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Enter email' : null,
                 ),
 
                 const SizedBox(height: 10),
 
-                // 🔥 ROLE INDICATOR + SELECTOR
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        "Login as",
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 8),
-
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ChoiceChip(
-                            label: const Text("Student"),
-                            selected: _selectedRole == UserRole.student,
-                            onSelected: (val) {
-                              setState(() {
-                                _selectedRole = UserRole.student;
-                              });
-                            },
-                          ),
-                          const SizedBox(width: 10),
-                          ChoiceChip(
-                            label: const Text("Teacher"),
-                            selected: _selectedRole == UserRole.teacher,
-                            onSelected: (val) {
-                              setState(() {
-                                _selectedRole = UserRole.teacher;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-
-                // EMAIL
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Enter email';
-                    }
-                    return null;
-                  },
-                ),
-
-                const SizedBox(height: 16),
-
-                // PASSWORD
+                // ── Password ──────────────────────
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility
-                            : Icons.visibility_off,
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () => setState(
+                        () => _obscurePassword = !_obscurePassword,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
                     ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Enter password';
-                    }
-                    return null;
-                  },
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Enter password' : null,
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
-                // LOGIN BUTTON
+                // ── Button ────────────────────────
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleLogin,
                   child: _isLoading
                       ? const CircularProgressIndicator()
-                      : const Text("Login"),
+                      : const Text('Login'),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 10),
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('Need an account? '),
-                    TextButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SignupScreen(),
-                                ),
-                              );
-                            },
-                      child: const Text('Sign up'),
-                    ),
-                  ],
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SignupScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text('Create account'),
                 ),
               ],
             ),
