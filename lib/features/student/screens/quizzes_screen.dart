@@ -333,219 +333,157 @@ class _AITabState extends State<_AITab> {
                 SizedBox(width: 10),
                 Text(
                   'AI Quiz Generator',
-                  style: TextStyle(color: _primary, fontSize: 20, fontWeight: FontWeight.w800),
-                ),
-              ]),
-              const SizedBox(height: 16),
-
-              // Subject
-              _StyledDropdown(
-                label: 'Subject',
-                value: _subject,
-                items: _subjectTopics.keys.toList(),
-                onChanged: _loading ? null : (v) => setState(() { _subject = v; _topic = null; _error = null; }),
-              ),
-              const SizedBox(height: 12),
-
-              // Level + Topic
-              Row(children: [
-                Expanded(child: _StyledDropdown(
-                  label: 'Level',
-                  value: _level,
-                  items: _levels,
-                  onChanged: _loading ? null : (v) => setState(() { _level = v; _error = null; }),
-                )),
-                const SizedBox(width: 12),
-                Expanded(child: _StyledDropdown(
-                  label: _subject == null ? 'Select subject first' : 'Topic',
-                  value: _topic,
-                  items: _topics,
-                  onChanged: (_loading || _subject == null) ? null : (v) => setState(() { _topic = v; _error = null; }),
-                )),
-              ]),
-
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3D1F1F),
-                    border: Border.all(color: const Color(0xFFF85149)),
-                    borderRadius: BorderRadius.circular(8),
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
                   ),
-                  child: Text(_error!, style: const TextStyle(color: Color(0xFFF85149), fontSize: 13)),
-                ),
-              ],
-
-              const SizedBox(height: 16),
-
-              ElevatedButton.icon(
-                onPressed: _loading ? null : _generate,
-                icon: Icon(_loading ? Icons.hourglass_top : Icons.smart_toy),
-                label: Text(_loading ? 'Generating...' : '🤖 Generate Quiz'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primary,
-                  minimumSize: const Size.fromHeight(48),
                 ),
               ),
             ],
           ),
-        ),
-
-        if (_loading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 36),
-            child: Column(children: [
-              CircularProgressIndicator(color: _primary),
-              SizedBox(height: 12),
-              Text('Generating your quiz, please wait...', style: TextStyle(color: _muted)),
-            ]),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            initialValue: _subject,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Subject',
+              prefixIcon: Icon(Icons.auto_stories_outlined),
+            ),
+            items: _subjectTopics.keys.map(_dropdownItem).toList(),
+            onChanged: _loading
+                ? null
+                : (value) {
+                    setState(() {
+                      _subject = value;
+                      _topic = null;
+                      _error = null;
+                      _questions = [];
+                      _answers.clear();
+                      _score = null;
+                    });
+                  },
           ),
-      ],
-    );
-  }
-}
-
-// ─── Teacher Tab ──────────────────────────────────────────────────────────────
-
-class _TeacherTab extends StatefulWidget {
-  const _TeacherTab();
-
-  @override
-  State<_TeacherTab> createState() => _TeacherTabState();
-}
-
-class _TeacherTabState extends State<_TeacherTab> {
-  static const _primary = Color(0xFF2EA043);
-  static const _bg      = Color(0xFF0D1117);
-  static const _surface = Color(0xFF161B22);
-  static const _border  = Color(0xFF21262D);
-  static const _text    = Color(0xFFE6EDF3);
-  static const _muted   = Color(0xFF8B949E);
-  static const _subtle  = Color(0xFF6E7681);
-
-  List<_TeacherQuiz> _online  = [];
-  List<_TeacherQuiz> _offline = [];
-  bool               _loading = true;
-  bool               _showOffline = false;
-  String             _search  = '';
-  _TeacherQuiz?      _active;
-
-  final _searchCtrl = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _fetch();
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _fetch() async {
-    setState(() => _loading = true);
-    try {
-      final headers = await authHeaders();
-      final results = await Future.wait([
-        http.get(Uri.parse('$kApiBase/quizzes/available'),         headers: headers),
-        http.get(Uri.parse('$kApiBase/quizzes/available/offline'), headers: headers),
-      ]);
-      if (!mounted) return;
-      if (results[0].statusCode == 200) {
-        _online = (jsonDecode(results[0].body) as List)
-            .map((e) => _TeacherQuiz.fromJson(e as Map<String, dynamic>))
-            .toList();
-      }
-      if (results[1].statusCode == 200) {
-        _offline = (jsonDecode(results[1].body) as List)
-            .map((e) => _TeacherQuiz.fromJson(e as Map<String, dynamic>))
-            .toList();
-      }
-    } catch (_) {}
-    finally { if (mounted) setState(() => _loading = false); }
-  }
-
-  List<_TeacherQuiz> get _filtered {
-    final list = _showOffline ? _offline : _online;
-    if (_search.isEmpty) return list;
-    final q = _search.toLowerCase();
-    return list.where((quiz) =>
-      quiz.title.toLowerCase().contains(q) ||
-      (quiz.subject?.toLowerCase().contains(q) ?? false),
-    ).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_active != null) {
-      return _QuizRunner(
-        questions: _active!.questions,
-        subject:   _active!.subject ?? '',
-        level:     _active!.form    ?? '',
-        topic:     _active!.title,
-        source:    'TEACHER',
-        quizId:    _active!.id,
-        onDone:    () => setState(() => _active = null),
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        // Search
-        TextField(
-          controller: _searchCtrl,
-          style: const TextStyle(color: _text),
-          decoration: InputDecoration(
-            hintText: 'Search quizzes...',
-            hintStyle: const TextStyle(color: _subtle),
-            prefixIcon: const Icon(Icons.search, color: _muted),
-            filled: true,
-            fillColor: _surface,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _border)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _border)),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _level,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Level',
+                    prefixIcon: Icon(Icons.school_outlined),
+                  ),
+                  items: _levels.map(_dropdownItem).toList(),
+                  onChanged: _loading
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _level = value;
+                            _error = null;
+                            _questions = [];
+                            _answers.clear();
+                            _score = null;
+                          });
+                        },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _topic,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: _subject == null
+                        ? 'Select subject first'
+                        : 'Topic',
+                    prefixIcon: const Icon(Icons.topic_outlined),
+                  ),
+                  items: _topics.map(_dropdownItem).toList(),
+                  onChanged: _loading || _subject == null
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _topic = value;
+                            _error = null;
+                            _questions = [];
+                            _answers.clear();
+                            _score = null;
+                          });
+                        },
+                ),
+              ),
+            ],
           ),
-          onChanged: (v) => setState(() => _search = v),
-        ),
-        const SizedBox(height: 10),
-
-        // Sub-tabs
-        Row(children: [
-          Expanded(child: _SubTabBtn(
-            label: '🌐 Online Quizzes',
-            selected: !_showOffline,
-            onTap: () => setState(() => _showOffline = false),
-          )),
-          const SizedBox(width: 8),
-          Expanded(child: _SubTabBtn(
-            label: '📄 Offline / Print',
-            selected: _showOffline,
-            onTap: () => setState(() => _showOffline = true),
-          )),
-        ]),
-        const SizedBox(height: 14),
-
-        if (_loading)
-          const Center(child: CircularProgressIndicator(color: _primary))
-        else if (_filtered.isEmpty)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.errorSurface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.accent4),
+              ),
               child: Text(
-                _showOffline ? 'No offline quizzes available.' : 'No online quizzes available.',
-                style: const TextStyle(color: _subtle),
+                _error!,
+                style: const TextStyle(color: AppColors.accent4),
               ),
             ),
-          )
-        else
-          ...(_filtered.map((quiz) => _TeacherQuizCard(
-            quiz: quiz,
-            isOffline: _showOffline,
-            onTake: () => setState(() => _active = quiz),
-          ))),
+          ],
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _loading ? null : _generateQuiz,
+            icon: Icon(_loading ? Icons.hourglass_top : Icons.smart_toy),
+            label: Text(_loading ? 'Generating...' : 'Generate Quiz'),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  DropdownMenuItem<String> _dropdownItem(String value) {
+    return DropdownMenuItem(
+      value: value,
+      child: Text(value, overflow: TextOverflow.ellipsis),
+    );
+  }
+
+  Widget _buildLoading() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 36),
+      child: Column(
+        children: [
+          CircularProgressIndicator(color: AppColors.primary),
+          SizedBox(height: 12),
+          Text(
+            'Generating your static quiz preview...',
+            style: TextStyle(color: AppColors.text2),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuizHeader() {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            '${_subject ?? ''} - ${_level ?? ''} - ${_topic ?? ''}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppColors.text2),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          '${_answers.length} / ${_questions.length} answered',
+          style: const TextStyle(color: AppColors.text2),
+        ),
       ],
     );
   }
