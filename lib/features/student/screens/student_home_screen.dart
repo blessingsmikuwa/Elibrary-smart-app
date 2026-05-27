@@ -648,17 +648,16 @@ class _StatsGrid extends StatelessWidget {
       (stats.downloads,    'Downloads'),
       (stats.quizzesCount, 'Quizzes Completed'),
       (stats.pastPapers,   'Resources Viewed'),
-      (stats.averageScore, 'Average Quiz Score'),
     ];
     return LayoutBuilder(builder: (context, constraints) {
-      final cols = constraints.maxWidth >= 720 ? 4 : 2;
+      final cols = constraints.maxWidth >= 720 ? 3 : 2;
       return GridView.builder(
         itemCount: items.length,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols, crossAxisSpacing: 12, mainAxisSpacing: 12,
-          childAspectRatio: cols == 4 ? 1.55 : 1.25,
+          childAspectRatio: cols == 3 ? 1.55 : 1.25,
         ),
         itemBuilder: (context, i) => _DashCard(child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,37 +1,111 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
 import '../../../core/theme/app_theme.dart';
+import '../../student/screens/api_service.dart';
 import 'upload_material_screen.dart';
 import 'teaching_materials_screen.dart';
 import 'create_quiz_screen.dart';
 import 'student_progress_screen.dart';
 import 'teacher_profile_screen.dart';
 
+// ─── Colours ──────────────────────────────────────────────────────────────────
+
+const _bg      = Color(0xFF0D1117);
+const _surface = Color(0xFF161B22);
+const _border  = Color(0xFF21262D);
+const _primary = Color(0xFF2EA043);
+const _text    = Color(0xFFE6EDF3);
+const _muted   = Color(0xFF8B949E);
+const _subtle  = Color(0xFF6E7681);
+const _red     = Color(0xFFDA3633);
+const _yellow  = Color(0xFFE3A525);
+const _blue    = Color(0xFF58A6FF);
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+class _TeacherStats {
+  final int    totalStudents;
+  final double avgScore;
+  const _TeacherStats({required this.totalStudents, required this.avgScore});
+  factory _TeacherStats.fromJson(Map<String, dynamic> j) => _TeacherStats(
+    totalStudents: (j['totalStudents'] as num?)?.toInt() ?? 0,
+    avgScore:      (j['avgScore']      as num?)?.toDouble() ?? 0,
+  );
+}
+
+class _Resource {
+  final String  id;
+  final String  title;
+  final String? type;
+  final String? description;
+  final String? fileUrl;
+  final int     downloadCount;
+  final String? targetClassName;
+  const _Resource({
+    required this.id, required this.title, this.type,
+    this.description, this.fileUrl, required this.downloadCount,
+    this.targetClassName,
+  });
+  factory _Resource.fromJson(Map<String, dynamic> j) => _Resource(
+    id:              j['id']?.toString()          ?? '',
+    title:           j['title']?.toString()       ?? '',
+    type:            j['type']?.toString(),
+    description:     j['description']?.toString(),
+    fileUrl:         j['fileUrl']?.toString(),
+    downloadCount:   (j['downloadCount'] as num?)?.toInt() ?? 0,
+    targetClassName: (j['targetClass'] as Map<String, dynamic>?)?['name']?.toString(),
+  );
+}
+
+class _Quiz {
+  final String  id;
+  final String  title;
+  final String? subject;
+  final String? form;
+  final DateTime? createdAt;
+  const _Quiz({required this.id, required this.title, this.subject, this.form, this.createdAt});
+  factory _Quiz.fromJson(Map<String, dynamic> j) {
+    DateTime? ca;
+    try { if (j['createdAt'] is String) ca = DateTime.parse(j['createdAt']); } catch (_) {}
+    return _Quiz(
+      id:        j['id']?.toString()      ?? '',
+      title:     j['title']?.toString()   ?? '',
+      subject:   j['subject']?.toString(),
+      form:      j['form']?.toString(),
+      createdAt: ca,
+    );
+  }
+  String get formattedDate {
+    if (createdAt == null) return '—';
+    const m = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${createdAt!.day} ${m[createdAt!.month]} ${createdAt!.year}';
+  }
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
 class TeacherHomeScreen extends StatefulWidget {
   const TeacherHomeScreen({super.key});
-
-  @override
-  State<TeacherHomeScreen> createState() => _TeacherHomeScreenState();
+  @override State<TeacherHomeScreen> createState() => _TeacherHomeScreenState();
 }
 
 class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   int _currentIndex = 0;
-  
+
+  void _goTo(int index) => setState(() => _currentIndex = index);
+
   final List<String> _titles = ['Dashboard', 'Materials', 'Create Quiz', 'Progress', 'Profile'];
-  
-  Widget _getCurrentScreen() {
+
+  Widget _screen() {
     switch (_currentIndex) {
-      case 0:
-        return const DashboardContent();
-      case 1:
-        return TeachingMaterialsScreen();
-      case 2:
-        return CreateQuizScreen();
-      case 3:
-        return StudentProgressScreen();
-      case 4:
-        return TeacherProfileScreen();
-      default:
-        return const DashboardContent();
+      case 0: return _DashboardContent(onNavigate: _goTo);
+      case 1: return TeachingMaterialsScreen();
+      case 2: return CreateQuizScreen();
+      case 3: return StudentProgressScreen();
+      case 4: return TeacherProfileScreen();
+      default: return _DashboardContent(onNavigate: _goTo);
     }
   }
 
@@ -40,55 +114,29 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_currentIndex]),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.text,
+        backgroundColor: _surface,
+        foregroundColor: _text,
       ),
-      body: _getCurrentScreen(),
+      body: _screen(),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: Color(0xFF30363d), width: 1),
-          ),
+          border: Border(top: BorderSide(color: _border)),
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          backgroundColor: AppColors.surface,
-          selectedItemColor: AppColors.primary,
-          unselectedItemColor: AppColors.text2,
-          type: BottomNavigationBarType.fixed,
-          selectedFontSize: 12,
+          onTap:        _goTo,
+          backgroundColor:    _surface,
+          selectedItemColor:   _primary,
+          unselectedItemColor: _muted,
+          type:            BottomNavigationBarType.fixed,
+          selectedFontSize:   12,
           unselectedFontSize: 12,
           items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard),
-              activeIcon: Icon(Icons.dashboard, color: AppColors.primary),
-              label: 'Dashboard',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.book),
-              activeIcon: Icon(Icons.book, color: AppColors.primary),
-              label: 'Materials',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.quiz),
-              activeIcon: Icon(Icons.quiz, color: AppColors.primary),
-              label: 'Create Quiz',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.bar_chart),
-              activeIcon: Icon(Icons.bar_chart, color: AppColors.primary),
-              label: 'Progress',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              activeIcon: Icon(Icons.person, color: AppColors.primary),
-              label: 'Profile',
-            ),
+            BottomNavigationBarItem(icon: Icon(Icons.dashboard),    activeIcon: Icon(Icons.dashboard,    color: _primary), label: 'Dashboard'),
+            BottomNavigationBarItem(icon: Icon(Icons.book),         activeIcon: Icon(Icons.book,         color: _primary), label: 'Materials'),
+            BottomNavigationBarItem(icon: Icon(Icons.quiz),         activeIcon: Icon(Icons.quiz,         color: _primary), label: 'Create Quiz'),
+            BottomNavigationBarItem(icon: Icon(Icons.bar_chart),    activeIcon: Icon(Icons.bar_chart,    color: _primary), label: 'Progress'),
+            BottomNavigationBarItem(icon: Icon(Icons.person),       activeIcon: Icon(Icons.person,       color: _primary), label: 'Profile'),
           ],
         ),
       ),
@@ -96,703 +144,467 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   }
 }
 
-// Dashboard Content Widget (embedded in the same file)
-class DashboardContent extends StatefulWidget {
-  const DashboardContent({super.key});
+// ─── Dashboard content ────────────────────────────────────────────────────────
 
-  @override
-  State<DashboardContent> createState() => _DashboardContentState();
+class _DashboardContent extends StatefulWidget {
+  final ValueChanged<int> onNavigate;
+  const _DashboardContent({required this.onNavigate});
+  @override State<_DashboardContent> createState() => _DashboardContentState();
 }
 
-class _DashboardContentState extends State<DashboardContent> {
-  bool _isLoading = true;
-  String _teacherName = '';
-  String _role = '';
-  String _school = '';
-  List<Map<String, String>> _stats = [];
-  List<Map<String, dynamic>> _materials = [];
-  List<Map<String, dynamic>> _quizResults = [];
+class _DashboardContentState extends State<_DashboardContent> {
+  bool            _loading     = true;
+  String?         _error;
+  String          _firstName   = 'Teacher';
+  String          _lastName    = '';
+  String          _schoolName  = '';
+  _TeacherStats?  _stats;
+  List<_Resource> _resources   = [];
+  List<_Quiz>     _quizzes     = [];
+  String?         _userId;
 
   @override
-  void initState() {
-    super.initState();
-    _loadDashboardData();
+  void initState() { super.initState(); _fetchAll(); }
+
+  Future<void> _fetchAll() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final headers = await authHeaders();
+      final results = await Future.wait([
+        http.get(Uri.parse('$kApiBase/profiles/me'),           headers: headers),
+        http.get(Uri.parse('$kApiBase/resources'),             headers: headers),
+        http.get(Uri.parse('$kApiBase/quizzes/mine'),          headers: headers),
+        http.get(Uri.parse('$kApiBase/quizzes/teacher/stats'), headers: headers),
+      ]);
+      if (!mounted) return;
+
+      if (results[0].statusCode < 300) {
+        final p = jsonDecode(results[0].body) as Map<String, dynamic>;
+        _firstName  = p['firstName'] as String? ?? 'Teacher';
+        _lastName   = p['lastName']  as String? ?? '';
+        _schoolName = (p['school'] as Map<String, dynamic>?)?['name'] as String? ?? '';
+        _userId     = p['userId']?.toString() ?? p['id']?.toString();
+      }
+
+      if (results[1].statusCode < 300) {
+        final data = jsonDecode(results[1].body);
+        final arr  = data is Map ? (data['data'] as List? ?? []) : (data as List? ?? []);
+        final allRes = arr.map((e) => _Resource.fromJson(e as Map<String, dynamic>)).toList();
+        // filter to this teacher's uploads (match uploaderId)
+        _resources = allRes.where((r) {
+          final raw = arr.firstWhere(
+            (e) => (e as Map<String, dynamic>)['id']?.toString() == r.id,
+            orElse: () => <String, dynamic>{},
+          ) as Map<String, dynamic>;
+          return _userId == null || raw['uploaderId']?.toString() == _userId;
+        }).take(3).toList();
+      }
+
+      if (results[2].statusCode < 300) {
+        _quizzes = (jsonDecode(results[2].body) as List)
+            .map((e) => _Quiz.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+
+      if (results[3].statusCode < 300) {
+        _stats = _TeacherStats.fromJson(jsonDecode(results[3].body) as Map<String, dynamic>);
+      }
+    } catch (_) {
+      _error = 'Failed to load dashboard data.';
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
-  Future<void> _loadDashboardData() async {
-    await Future.delayed(const Duration(seconds: 1));
-    
-    setState(() {
-      _teacherName = 'Mr. Phiri';
-      _role = 'Biology Teacher';
-      _school = 'Zomba Secondary School';
-      
-      _stats = [
-        {'number': '28', 'label': 'Teaching Materials Uploaded'},
-        {'number': '156', 'label': 'Total Students'},
-        {'number': '12', 'label': 'Active Quizzes'},
-        {'number': '78%', 'label': 'Average Class Score'},
-      ];
-      
-      _materials = [
-        {
-          'type': 'LESSON PLAN',
-          'title': 'Cell Structure and Function',
-          'form': 'Form 3',
-          'views': 142,
-          'downloads': 67,
-          'description': 'Comprehensive lesson plan covering prokaryotic and eukaryotic cells, organelles, and their functions.',
-          'typeColor': const Color(0xFFe3a525),
-        },
-        {
-          'type': 'WORKSHEET',
-          'title': 'Photosynthesis Practice',
-          'form': 'Form 2',
-          'views': 98,
-          'downloads': 45,
-          'description': 'Practice questions and diagrams covering the process of photosynthesis and factors affecting it.',
-          'typeColor': const Color(0xFF2ea043),
-        },
-        {
-          'type': 'PRESENTATION',
-          'title': 'Human Digestive System',
-          'form': 'Form 3',
-          'views': 187,
-          'downloads': 92,
-          'description': 'Slide presentation with diagrams and explanations of digestive organs and processes.',
-          'typeColor': const Color(0xFFa371f7),
-        },
-      ];
-      
-      _quizResults = [
-        {'student': 'Chisomo Banda', 'quiz': 'Cell Biology Quiz', 'form': 'Form 3', 'score': 18, 'total': 20, 'date': 'Feb 5, 2026'},
-        {'student': 'Mphatso Chirwa', 'quiz': 'Cell Biology Quiz', 'form': 'Form 3', 'score': 14, 'total': 20, 'date': 'Feb 5, 2026'},
-        {'student': 'Thandiwe Mwale', 'quiz': 'Photosynthesis Quiz', 'form': 'Form 2', 'score': 19, 'total': 20, 'date': 'Feb 4, 2026'},
-        {'student': 'Kondwani Phiri', 'quiz': 'Cell Biology Quiz', 'form': 'Form 3', 'score': 10, 'total': 20, 'date': 'Feb 5, 2026'},
-        {'student': 'Grace Mkandawire', 'quiz': 'Photosynthesis Quiz', 'form': 'Form 2', 'score': 17, 'total': 20, 'date': 'Feb 4, 2026'},
-      ];
-      
-      _isLoading = false;
-    });
-  }
-
-  Color _getScoreColor(int score, int total) {
-    double pct = (score / total) * 100;
-    if (pct >= 80) return AppColors.success;
-    if (pct >= 60) return AppColors.warning;
-    return AppColors.error;
-  }
-
-  Color _getScoreBgColor(int score, int total) {
-    double pct = (score / total) * 100;
-    if (pct >= 80) return const Color(0xFF1a4731);
-    if (pct >= 60) return const Color(0xFF3d2f0a);
-    return const Color(0xFF3d1a1a);
-  }
+  String get _displayName => '$_firstName $_lastName'.trim();
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        appBar: _buildAppBar(),
-        body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(color: AppColors.primary),
-              SizedBox(height: 16),
-              Text(
-                'Loading dashboard...',
-                style: TextStyle(color: AppColors.text2, fontSize: 16),
-              ),
-            ],
-          ),
-        ),
-      );
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(color: _primary));
     }
 
-    return Scaffold(
-      appBar: _buildAppBar(),
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: _loadDashboardData,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildWelcomeBanner(),
-              const SizedBox(height: 24),
-              _buildStatsGrid(),
-              const SizedBox(height: 32),
-              _buildTeachingMaterialsSection(),
-              const SizedBox(height: 32),
-              _buildQuizResultsSection(),
-              const SizedBox(height: 24),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      title: const Text('Teacher Dashboard'),
-      backgroundColor: AppColors.surface,
-      foregroundColor: AppColors.text,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: AppColors.text2),
-          onPressed: () {},
-        ),
-        CircleAvatar(
-          backgroundColor: AppColors.primary,
-          radius: 16,
-          child: Text(
-            _teacherName.isNotEmpty ? _teacherName[0] : 'T',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-      ],
-    );
-  }
-
-  Widget _buildWelcomeBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1a3a2a),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return RefreshIndicator(
+      color: _primary,
+      onRefresh: _fetchAll,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Welcome back,',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _teacherName,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$_role | $_school',
-                      style: const TextStyle(
-                        color: Color(0xFFc9d1d9),
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+          if (_error != null) _ErrorBanner(message: _error!),
+
+          // ── Welcome banner
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A3A2A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _primary),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Welcome back,',
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+                  Text(_displayName.isEmpty ? 'Teacher' : _displayName,
+                      style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
+                  if (_schoolName.isNotEmpty)
+                    Text('📍 $_schoolName',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+                ])),
+              ]),
+              const SizedBox(height: 16),
+              Wrap(spacing: 10, runSpacing: 10, children: [
+                _BannerBtn(
+                  label: '✏️ Create Quiz',
+                  bg: _yellow, fg: Colors.black,
+                  onTap: () => widget.onNavigate(2),
                 ),
-              ),
-            ],
+                _BannerBtn(
+                  label: '📤 Upload Material',
+                  bg: const Color(0xFF21262D), fg: _text,
+                  border: _border,
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const UploadMaterialScreen())),
+                ),
+              ]),
+            ]),
           ),
+
           const SizedBox(height: 20),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              ElevatedButton.icon(
-                onPressed: () {
-                  // TODO: Navigate to Create Quiz
-                },
-                icon: const Icon(Icons.edit, size: 18),
-                label: const Text('✏️ Create Quiz'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFe3a525),
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () {
-                  // Navigate to Upload Material
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const UploadMaterialScreen(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.upload, size: 18),
-                label: const Text('📤 Upload Material'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.text,
-                  side: const BorderSide(color: Color(0xFF30363d)),
-                  backgroundColor: const Color(0xFF21262d),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => TeachingMaterialsScreen()),
-                        );
-                      },
-                      icon: const Icon(Icons.library_books, size: 18),
-                      label: const Text('Materials'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        textStyle: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => CreateQuizScreen()),
-                        );
-                      },
-                      icon: const Icon(Icons.quiz, size: 18),
-                      label: const Text('Create Quiz'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        textStyle: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => StudentProgressScreen()),
-                        );
-                      },
-                      icon: const Icon(Icons.bar_chart, size: 18),
-                      label: const Text('Progress'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        textStyle: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => TeacherProfileScreen()),
-                        );
-                      },
-                      icon: const Icon(Icons.person, size: 18),
-                      label: const Text('Profile'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        textStyle: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+
+          // ── Stats grid
+          _StatsGrid(
+            resources: _resources.length,
+            quizzes:   _quizzes.length,
+            stats:     _stats,
           ),
+
+          const SizedBox(height: 16),
+
+          // ── Student progress banner (mirrors web)
+          if (_stats != null && _stats!.totalStudents > 0)
+            GestureDetector(
+              onTap: () => widget.onNavigate(3),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _surface, border: Border.all(color: _border),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('📊 Student Progress Overview',
+                        style: TextStyle(color: _text, fontWeight: FontWeight.w600, fontSize: 14)),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${_stats!.totalStudents} student${_stats!.totalStudents != 1 ? "s" : ""} have attempted your quizzes · '
+                      'Class avg: ${_stats!.avgScore.toStringAsFixed(1)}%',
+                      style: const TextStyle(color: _subtle, fontSize: 12),
+                    ),
+                  ])),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(color: _primary, borderRadius: BorderRadius.circular(6)),
+                    child: const Text('View →', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ]),
+              ),
+            ),
+
+          // ── Recent Materials
+          _SectionHeader(
+            title: '📖 My Recent Materials',
+            actionLabel: 'View All',
+            onAction: () => widget.onNavigate(1),
+          ),
+          const SizedBox(height: 12),
+          _resources.isEmpty
+              ? _EmptyBox(icon: '📭', message: 'No materials uploaded yet.')
+              : SizedBox(
+                  height: 240,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _resources.length,
+                    itemBuilder: (_, i) => _ResourceCard(resource: _resources[i]),
+                  ),
+                ),
+
+          const SizedBox(height: 28),
+
+          // ── Recent Quizzes table
+          _SectionHeader(
+            title: '📊 My Recent Quizzes',
+            actionLabel: '+ Create New',
+            onAction: () => widget.onNavigate(2),
+          ),
+          const SizedBox(height: 12),
+          _quizzes.isEmpty
+              ? _EmptyBox(icon: '📭', message: 'No quizzes created yet.')
+              : _QuizTable(quizzes: _quizzes.take(5).toList(), total: _quizzes.length,
+                  onViewAll: () => widget.onNavigate(2)),
+
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
+}
 
-  Widget _buildStatsGrid() {
+// ─── Stats grid ───────────────────────────────────────────────────────────────
+
+class _StatsGrid extends StatelessWidget {
+  final int            resources;
+  final int            quizzes;
+  final _TeacherStats? stats;
+  const _StatsGrid({required this.resources, required this.quizzes, required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (resources.toString(),                              'Materials Uploaded', '📚'),
+      (quizzes.toString(),                               'Quizzes Created',    '📝'),
+      ((stats?.totalStudents ?? '—').toString(),         'Total Students',     '👥'),
+      (stats != null ? '${stats!.avgScore.toStringAsFixed(1)}%' : '—', 'Avg Class Score', '📊'),
+    ];
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 1.6,
+        crossAxisCount: 2, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.6,
       ),
-      itemCount: _stats.length,
-      itemBuilder: (context, index) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF30363d)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                _stats[index]['number']!,
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _stats[index]['label']!,
-                style: const TextStyle(
-                  color: Color(0xFF8b949e),
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+      itemCount: items.length,
+      itemBuilder: (_, i) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _surface, border: Border.all(color: _border), borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text(items[i].$1,
+              style: const TextStyle(color: _primary, fontSize: 26, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(items[i].$2,
+              style: const TextStyle(color: _subtle, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+        ]),
+      ),
     );
   }
+}
 
-  Widget _buildTeachingMaterialsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              '📖 My Teaching Materials',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () {
-                // TODO: Navigate to Materials
-              },
-              icon: const Icon(Icons.add, size: 18, color: Color(0xFFda3633)),
-              label: const Text(
-                '+ Manage Materials',
-                style: TextStyle(
-                  color: Color(0xFFda3633),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 280,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: _materials.length,
-            itemBuilder: (context, index) {
-              final material = _materials[index];
-              return Container(
-                width: 300,
-                margin: EdgeInsets.only(
-                  right: index < _materials.length - 1 ? 16 : 0,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF30363d)),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: (material['typeColor'] as Color).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: (material['typeColor'] as Color).withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Text(
-                        material['type'],
-                        style: TextStyle(
-                          color: material['typeColor'],
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      material['title'],
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(Icons.school, size: 14, color: Color(0xFF8b949e)),
-                        const SizedBox(width: 4),
-                        Text(
-                          '📅 ${material['form']}',
-                          style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12),
-                        ),
-                        const SizedBox(width: 12),
-                        const Icon(Icons.visibility, size: 14, color: Color(0xFF8b949e)),
-                        const SizedBox(width: 4),
-                        Text(
-                          '👁 ${material['views']}',
-                          style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12),
-                        ),
-                        const SizedBox(width: 12),
-                        const Icon(Icons.download, size: 14, color: Color(0xFF8b949e)),
-                        const SizedBox(width: 4),
-                        Text(
-                          '⬇ ${material['downloads']}',
-                          style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: Text(
-                        material['description'],
-                        style: const TextStyle(
-                          color: Color(0xFF8b949e),
-                          fontSize: 13,
-                          height: 1.4,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 36,
-                            child: ElevatedButton(
-                              onPressed: () {},
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFda3633),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                textStyle: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              child: const Text('View'),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: SizedBox(
-                            height: 36,
-                            child: OutlinedButton(
-                              onPressed: () {},
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.text,
-                                side: const BorderSide(color: Color(0xFF30363d)),
-                                backgroundColor: const Color(0xFF21262d),
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                textStyle: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              child: const Text('Edit'),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
+// ─── Resource card ────────────────────────────────────────────────────────────
 
-  Widget _buildQuizResultsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              '📊 Recent Quiz Results',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                // TODO: View all quiz results
-              },
-              child: const Text(
-                'View All',
-                style: TextStyle(
-                  color: Color(0xFF8b949e),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
+class _ResourceCard extends StatelessWidget {
+  final _Resource resource;
+  const _ResourceCard({required this.resource});
+
+  static const _typeColors = <String, Color>{
+    'LESSON PLAN':  Color(0xFFE3A525),
+    'WORKSHEET':    Color(0xFF2EA043),
+    'PRESENTATION': Color(0xFFA371F7),
+    'PDF':          Color(0xFF58A6FF),
+    'VIDEO':        Color(0xFFF0883E),
+  };
+
+  Color get _typeColor => _typeColors[resource.type?.toUpperCase()] ?? _muted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 260,
+      margin: const EdgeInsets.only(right: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _surface, border: Border.all(color: _border), borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF30363d)),
+            color: _typeColor.withValues(alpha: 0.12),
+            border: Border.all(color: _typeColor.withValues(alpha: 0.3)),
+            borderRadius: BorderRadius.circular(4),
           ),
-          child: Column(
-            children: [
-              // Table Header
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1a3a2a),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
-                  ),
-                ),
-                child: const Row(
-                  children: [
-                    Expanded(flex: 2, child: Text('Student Name', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
-                    Expanded(flex: 2, child: Text('Quiz', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
-                    Expanded(flex: 1, child: Text('Form', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
-                    Expanded(flex: 1, child: Text('Score', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
-                    Expanded(flex: 1, child: Text('Date', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
-                  ],
-                ),
-              ),
-              // Table Rows
-              ..._quizResults.asMap().entries.map((entry) {
-                final index = entry.key;
-                final result = entry.value;
-                final scoreColor = _getScoreColor(result['score'], result['total']);
-                final scoreBg = _getScoreBgColor(result['score'], result['total']);
-                
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    border: index < _quizResults.length - 1
-                        ? const Border(bottom: BorderSide(color: Color(0xFF30363d)))
-                        : null,
-                    color: index.isEven ? AppColors.surface : const Color(0xFF0d1117),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          result['student'],
-                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          result['quiz'],
-                          style: const TextStyle(color: Color(0xFF8b949e), fontSize: 13),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: Text(
-                          result['form'],
-                          style: const TextStyle(color: Color(0xFF8b949e), fontSize: 13),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: scoreBg,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: scoreColor.withValues(alpha: 0.3)),
-                          ),
-                          child: Text(
-                            '${result['score']}/${result['total']}',
-                            style: TextStyle(
-                              color: scoreColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 1,
-                        child: Text(
-                          result['date'],
-                          style: const TextStyle(color: Color(0xFF8b949e), fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
+          child: Text(resource.type ?? 'FILE',
+              style: TextStyle(color: _typeColor, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
         ),
-      ],
+        const SizedBox(height: 10),
+        Text(resource.title,
+            maxLines: 2, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: _text, fontSize: 14, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Row(children: [
+          if (resource.targetClassName != null) ...[
+            Text('📅 ${resource.targetClassName}',
+                style: const TextStyle(color: _muted, fontSize: 11)),
+            const SizedBox(width: 10),
+          ],
+          Text('⬇️ ${resource.downloadCount}',
+              style: const TextStyle(color: _muted, fontSize: 11)),
+        ]),
+        if (resource.description != null) ...[
+          const SizedBox(height: 8),
+          Expanded(child: Text(resource.description!,
+              maxLines: 3, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: _subtle, fontSize: 12, height: 1.4))),
+        ] else const Spacer(),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: ElevatedButton(
+            onPressed: () { if (resource.fileUrl != null) {} },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _red, padding: const EdgeInsets.symmetric(vertical: 8),
+            ),
+            child: const Text('View', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          )),
+          const SizedBox(width: 8),
+          Expanded(child: OutlinedButton(
+            onPressed: () {},
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _text, side: const BorderSide(color: _border),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+            ),
+            child: const Text('Edit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          )),
+        ]),
+      ]),
     );
   }
+}
+
+// ─── Quiz table ───────────────────────────────────────────────────────────────
+
+class _QuizTable extends StatelessWidget {
+  final List<_Quiz> quizzes;
+  final int         total;
+  final VoidCallback onViewAll;
+  const _QuizTable({required this.quizzes, required this.total, required this.onViewAll});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _surface, border: Border.all(color: _border), borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A3A2A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+          ),
+          child: const Row(children: [
+            Expanded(flex: 3, child: Text('Title',   style: TextStyle(color: _text, fontSize: 12, fontWeight: FontWeight.w600))),
+            Expanded(flex: 2, child: Text('Subject', style: TextStyle(color: _text, fontSize: 12, fontWeight: FontWeight.w600))),
+            Expanded(flex: 1, child: Text('Form',    style: TextStyle(color: _text, fontSize: 12, fontWeight: FontWeight.w600))),
+            Expanded(flex: 2, child: Text('Created', style: TextStyle(color: _text, fontSize: 12, fontWeight: FontWeight.w600))),
+          ]),
+        ),
+        // Rows
+        ...quizzes.asMap().entries.map((e) {
+          final i = e.key; final q = e.value;
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: i.isEven ? _surface : _bg,
+              border: i < quizzes.length - 1 ? const Border(bottom: BorderSide(color: _border)) : null,
+            ),
+            child: Row(children: [
+              Expanded(flex: 3, child: Text(q.title, style: const TextStyle(color: _text, fontSize: 13), overflow: TextOverflow.ellipsis)),
+              Expanded(flex: 2, child: Text(q.subject ?? '—', style: const TextStyle(color: _muted, fontSize: 12))),
+              Expanded(flex: 1, child: Text(q.form    ?? '—', style: const TextStyle(color: _muted, fontSize: 12))),
+              Expanded(flex: 2, child: Text(q.formattedDate,   style: const TextStyle(color: _muted, fontSize: 12))),
+            ]),
+          );
+        }),
+        // View all footer
+        if (total > 5)
+          GestureDetector(
+            onTap: onViewAll,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: const BoxDecoration(border: Border(top: BorderSide(color: _border))),
+              alignment: Alignment.center,
+              child: Text('View all $total quizzes →',
+                  style: const TextStyle(color: _blue, fontSize: 13)),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+// ─── Shared widgets ───────────────────────────────────────────────────────────
+
+class _BannerBtn extends StatelessWidget {
+  final String label; final Color bg, fg; final Color? border; final VoidCallback onTap;
+  const _BannerBtn({required this.label, required this.bg, required this.fg, required this.onTap, this.border});
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        border: border != null ? Border.all(color: border!) : null,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(label, style: TextStyle(color: fg, fontWeight: FontWeight.w600, fontSize: 13)),
+    ),
+  );
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title, actionLabel; final VoidCallback onAction;
+  const _SectionHeader({required this.title, required this.actionLabel, required this.onAction});
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(title, style: const TextStyle(color: _text, fontSize: 18, fontWeight: FontWeight.w800)),
+      GestureDetector(
+        onTap: onAction,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: _primary, borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(actionLabel, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+        ),
+      ),
+    ],
+  );
+}
+
+class _EmptyBox extends StatelessWidget {
+  final String icon, message;
+  const _EmptyBox({required this.icon, required this.message});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(40),
+    decoration: BoxDecoration(
+      color: _surface, border: Border.all(color: _border), borderRadius: BorderRadius.circular(8),
+    ),
+    child: Column(children: [
+      Text(icon, style: const TextStyle(fontSize: 36)),
+      const SizedBox(height: 10),
+      Text(message, style: const TextStyle(color: _subtle, fontSize: 13)),
+    ]),
+  );
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner({required this.message});
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    decoration: BoxDecoration(
+      color: const Color(0xFF3D1F1F),
+      border: Border.all(color: const Color(0xFFF85149)),
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Text(message, style: const TextStyle(color: Color(0xFFF85149), fontSize: 13)),
+  );
 }
