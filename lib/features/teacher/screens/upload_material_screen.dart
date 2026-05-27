@@ -1,397 +1,560 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_theme.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'api_service.dart'; // kApiBase, authHeaders()
 
-class UploadMaterialScreen extends StatefulWidget {
-  const UploadMaterialScreen({super.key});
+const _resourceTypes = [
+  {'label': 'PDF Document',  'type': 'PDF',   'form': 'DOCUMENT'},
+  {'label': 'Word Document', 'type': 'PDF',   'form': 'DOCUMENT'},
+  {'label': 'Past Paper',    'type': 'PDF',   'form': 'OTHER'},
+  {'label': 'Video',         'type': 'VIDEO', 'form': 'VIDEO'},
+  {'label': 'Image',         'type': 'IMAGE', 'form': 'OTHER'},
+];
 
-  @override
-  State<UploadMaterialScreen> createState() => _UploadMaterialScreenState();
+MediaType _mimeFor(String ext) {
+  switch (ext.toLowerCase()) {
+    case 'pdf':  return MediaType('application', 'pdf');
+    case 'doc':
+    case 'docx': return MediaType('application', 'msword');
+    case 'ppt':
+    case 'pptx': return MediaType('application', 'vnd.ms-powerpoint');
+    case 'mp4':  return MediaType('video', 'mp4');
+    case 'png':  return MediaType('image', 'png');
+    case 'jpg':
+    case 'jpeg': return MediaType('image', 'jpeg');
+    default:     return MediaType('application', 'octet-stream');
+  }
 }
 
-class _UploadMaterialScreenState extends State<UploadMaterialScreen> {
-  String _selectedType = 'Lesson Plan';
-  String _selectedForm = 'Form 3';
-  String _selectedSubject = 'Biology';
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  bool _isUploading = false;
+/// Shown as a full-screen overlay modal, matching the web upload modal.
+class UploadModal extends StatefulWidget {
+  final VoidCallback onClose;
+  final VoidCallback onUploaded;
+  final void Function(String, {String type}) toast;
 
-  final List<String> _materialTypes = ['Lesson Plan', 'Worksheet', 'Presentation', 'Notes', 'Exam'];
-  final List<String> _forms = ['Form 1', 'Form 2', 'Form 3', 'Form 4'];
-  final List<String> _subjects = ['Biology', 'Chemistry', 'Physics', 'Mathematics', 'English'];
+  const UploadModal({
+    required this.onClose,
+    required this.onUploaded,
+    required this.toast,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Upload Material'),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.text,
-        actions: [
-          TextButton(
-            onPressed: _isUploading ? null : _uploadMaterial,
-            child: _isUploading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: AppColors.primary,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Text(
-                    'Upload',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Upload Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1a3a2a),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.upload_file, size: 40, color: AppColors.primary),
-                  SizedBox(height: 12),
-                  Text(
-                    'Upload Teaching Material',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Share your teaching resources with students',
-                    style: TextStyle(
-                      color: Color(0xFFc9d1d9),
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
+  State<UploadModal> createState() => _UploadModalState();
+}
 
-            // Material Type
-            _buildSectionTitle('Material Type'),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF30363d)),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedType,
-                  isExpanded: true,
-                  dropdownColor: AppColors.surface,
-                  style: const TextStyle(color: AppColors.text, fontSize: 14),
-                  items: _materialTypes.map((type) {
-                    return DropdownMenuItem(
-                      value: type,
-                      child: Text(type),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedType = value!;
-                    });
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
+class _UploadModalState extends State<UploadModal> {
+  String        _title          = '';
+  String        _description    = '';
+  String?       _categoryId;
+  String?       _classId;
+  String        _selectedLabel  = 'PDF Document';
+  String        _type           = 'PDF';
+  String        _resourceForm   = 'DOCUMENT';
+  String        _targetAudience = 'Students';
+  String        _visibility     = 'PUBLIC';
+  PlatformFile? _pickedFile;
+  Uint8List?    _fileBytes;
+  bool          _uploading      = false;
+  double        _progress       = 0;
 
-            // Subject and Form
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSectionTitle('Subject'),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF30363d)),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedSubject,
-                            isExpanded: true,
-                            dropdownColor: AppColors.surface,
-                            style: const TextStyle(color: AppColors.text, fontSize: 14),
-                            items: _subjects.map((subject) {
-                              return DropdownMenuItem(
-                                value: subject,
-                                child: Text(subject),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedSubject = value!;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSectionTitle('Form'),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF30363d)),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedForm,
-                            isExpanded: true,
-                            dropdownColor: AppColors.surface,
-                            style: const TextStyle(color: AppColors.text, fontSize: 14),
-                            items: _forms.map((form) {
-                              return DropdownMenuItem(
-                                value: form,
-                                child: Text(form),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedForm = value!;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
+  List<Map<String, dynamic>> _categories = [];
+  List<Map<String, dynamic>> _classes    = [];
 
-            // Title
-            _buildSectionTitle('Title'),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _titleController,
-              style: const TextStyle(color: AppColors.text),
-              decoration: InputDecoration(
-                hintText: 'Enter material title',
-                hintStyle: const TextStyle(color: AppColors.text2),
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFF30363d)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFF30363d)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppColors.primary),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Description
-            _buildSectionTitle('Description'),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _descriptionController,
-              maxLines: 4,
-              style: const TextStyle(color: AppColors.text),
-              decoration: InputDecoration(
-                hintText: 'Describe your teaching material',
-                hintStyle: const TextStyle(color: AppColors.text2),
-                filled: true,
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFF30363d)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFF30363d)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppColors.primary),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // File Upload Area
-            _buildSectionTitle('Upload File'),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              height: 200,
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: AppColors.primary.withOpacity(0.5),
-                  style: BorderStyle.solid,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.cloud_upload,
-                    size: 60,
-                    color: AppColors.primary.withOpacity(0.5),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Drag & drop your file here',
-                    style: TextStyle(
-                      color: Color(0xFF8b949e),
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'or',
-                    style: TextStyle(
-                      color: Color(0xFF8b949e),
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.file_open, size: 18),
-                    label: const Text('Browse Files'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF21262d),
-                      foregroundColor: AppColors.text,
-                      side: const BorderSide(color: Color(0xFF30363d)),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Supported formats: PDF, DOC, PPT, XLS (Max 50MB)',
-                    style: TextStyle(
-                      color: Color(0xFF8b949e),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Upload Button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                onPressed: _isUploading ? null : _uploadMaterial,
-                icon: _isUploading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(Icons.upload),
-                label: Text(_isUploading ? 'Uploading...' : 'Upload Material'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  @override
+  void initState() {
+    super.initState();
+    _loadDropdowns();
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
-      ),
-    );
+  Future<void> _loadDropdowns() async {
+    try {
+      final headers = await authHeaders();
+      final catRes = await http.get(Uri.parse('$kApiBase/categories'), headers: headers);
+      final clsRes = await http.get(Uri.parse('$kApiBase/classes'),    headers: headers);
+      if (catRes.statusCode == 200) {
+        final data = jsonDecode(catRes.body);
+        setState(() => _categories = List<Map<String, dynamic>>.from(
+            data is List ? data : (data['data'] ?? [])));
+      }
+      if (clsRes.statusCode == 200) {
+        final data = jsonDecode(clsRes.body);
+        final list = List<Map<String, dynamic>>.from(
+            data is List ? data : (data['data'] ?? []));
+        list.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
+        setState(() => _classes = list);
+      }
+    } catch (_) {}
   }
 
-  Future<void> _uploadMaterial() async {
+  void _handleTypeChange(String label) {
+    final matched = _resourceTypes.firstWhere(
+        (t) => t['label'] == label,
+        orElse: () => _resourceTypes.first);
     setState(() {
-      _isUploading = true;
+      _selectedLabel = label;
+      _type          = matched['type']!;
+      _resourceForm  = matched['form']!;
     });
+  }
 
-    // Simulate upload
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'mp4', 'png', 'jpg'],
+      withData: true,
+    );
+    if (result != null && result.files.isNotEmpty) {
       setState(() {
-        _isUploading = false;
+        _pickedFile = result.files.first;
+        _fileBytes  = result.files.first.bytes;
       });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Material uploaded successfully!'),
-          backgroundColor: AppColors.primary,
-          action: SnackBarAction(
-            label: 'View',
-            textColor: Colors.white,
-            onPressed: () {
-              Navigator.pop(context);
-            },
-          ),
-        ),
-      );
+    }
+  }
+
+  Future<void> _upload() async {
+    if (_title.trim().isEmpty) {
+      widget.toast('Please fill in the title.', type: 'error'); return;
+    }
+    if (_pickedFile == null || _fileBytes == null) {
+      widget.toast('Please select a file.', type: 'error'); return;
+    }
+    setState(() { _uploading = true; _progress = 0; });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('accessToken') ?? '';
+
+      final uri     = Uri.parse('$kApiBase/resources/create-with-file');
+      final request = http.MultipartRequest('POST', uri)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..fields['title']          = _title.trim()
+        ..fields['description']    = _description.trim()
+        ..fields['type']           = _type
+        ..fields['form']           = _resourceForm
+        ..fields['status']         = 'PUBLISHED'
+        ..fields['targetAudience'] = _targetAudience
+        ..fields['visibility']     = _visibility
+        ..files.add(http.MultipartFile.fromBytes(
+          'file',
+          _fileBytes!,
+          filename: _pickedFile!.name,
+          contentType: _mimeFor(_pickedFile!.extension ?? ''),
+        ));
+
+      if (_categoryId != null) request.fields['categoryId'] = _categoryId!;
+      if (_classId    != null) request.fields['classId']    = _classId!;
+
+      setState(() => _progress = 0.3);
+      final streamed = await request.send();
+      setState(() => _progress = 0.8);
+      final res = await http.Response.fromStream(streamed);
+      setState(() => _progress = 1.0);
+
+      if (res.statusCode < 300) {
+        widget.toast('"$_title" uploaded successfully!', type: 'success');
+        widget.onUploaded();
+      } else {
+        final body = jsonDecode(res.body);
+        widget.toast(body['message']?.toString() ?? 'Upload failed', type: 'error');
+      }
+    } catch (e) {
+      widget.toast('Error: $e', type: 'error');
+    } finally {
+      setState(() { _uploading = false; _progress = 0; });
     }
   }
 
   @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black.withValues(alpha: 0.7),
+      child: Center(
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF161b22),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF30363d)),
+          ),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.88,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 12, 0),
+                child: Row(
+                  children: [
+                    const Text('📤 Upload New Resource',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Color(0xFF6e7681)),
+                      onPressed: widget.onClose,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Color(0xFF21262d)),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── File drop zone (tap to browse) ────────────
+                      GestureDetector(
+                        onTap: _uploading ? null : _pickFile,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 28),
+                          decoration: BoxDecoration(
+                            color: _pickedFile != null
+                                ? const Color(0xFF0d1117)
+                                : const Color(0xFF0d1117),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _pickedFile != null
+                                  ? const Color(0xFF2ea043)
+                                  : const Color(0xFF30363d),
+                              width: _pickedFile != null ? 2 : 1,
+                              style: BorderStyle.solid,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                _pickedFile != null ? '📄' : '☁️',
+                                style: const TextStyle(fontSize: 30),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _pickedFile != null
+                                    ? _pickedFile!.name
+                                    : 'Tap to browse a file',
+                                style: TextStyle(
+                                  color: _pickedFile != null
+                                      ? const Color(0xFF2ea043)
+                                      : const Color(0xFF8b949e),
+                                  fontSize: 13,
+                                  fontWeight: _pickedFile != null
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _pickedFile != null
+                                    ? '${(_pickedFile!.size / 1024 / 1024).toStringAsFixed(2)} MB'
+                                    : 'PDF, DOCX, MP4, Images',
+                                style: const TextStyle(
+                                    color: Color(0xFF6e7681), fontSize: 11),
+                              ),
+                              if (_pickedFile != null) ...[
+                                const SizedBox(height: 8),
+                                GestureDetector(
+                                  onTap: () => setState(
+                                      () { _pickedFile = null; _fileBytes = null; }),
+                                  child: const Text('Remove file',
+                                      style: TextStyle(
+                                          color: Color(0xFFf85149),
+                                          fontSize: 12)),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      if (_uploading) ...[
+                        const SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: _progress,
+                            backgroundColor: const Color(0xFF30363d),
+                            valueColor: const AlwaysStoppedAnimation(Color(0xFF2ea043)),
+                            minHeight: 5,
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 18),
+
+                      // ── Title ─────────────────────────────────────
+                      _label('Resource Title *'),
+                      _input(
+                        hint: 'e.g. Form 3 Biology Notes',
+                        onChanged: (v) => _title = v,
+                      ),
+                      const SizedBox(height: 12),
+
+                      // ── Description ───────────────────────────────
+                      _label('Description'),
+                      _input(
+                        hint: 'Brief description',
+                        maxLines: 2,
+                        onChanged: (v) => _description = v,
+                      ),
+                      const SizedBox(height: 12),
+
+                      // ── Subject + Form ────────────────────────────
+                      Row(children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _label('Subject'),
+                              _dropdown(
+                                hint: 'Select subject',
+                                value: _categoryId,
+                                items: _categories
+                                    .map((c) => DropdownMenuItem<String>(
+                                          value: c['id']?.toString(),
+                                          child: Text(c['name']?.toString() ?? ''),
+                                        ))
+                                    .toList(),
+                                onChanged: (v) =>
+                                    setState(() => _categoryId = v),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _label('Form'),
+                              _dropdown(
+                                hint: 'Select form',
+                                value: _classId,
+                                items: _classes
+                                    .map((c) => DropdownMenuItem<String>(
+                                          value: c['id']?.toString(),
+                                          child: Text(c['name']?.toString() ?? ''),
+                                        ))
+                                    .toList(),
+                                onChanged: (v) => setState(() => _classId = v),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: 12),
+
+                      // ── Type + Audience ───────────────────────────
+                      Row(children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _label('File Type'),
+                              _dropdown(
+                                hint: '',
+                                value: _selectedLabel,
+                                items: _resourceTypes
+                                    .map((t) => DropdownMenuItem<String>(
+                                          value: t['label'],
+                                          child: Text(t['label']!),
+                                        ))
+                                    .toList(),
+                                onChanged: (v) {
+                                  if (v != null) _handleTypeChange(v);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _label('Audience'),
+                              _dropdown(
+                                hint: '',
+                                value: _targetAudience,
+                                items: ['Students', 'Teachers', 'Both']
+                                    .map((v) => DropdownMenuItem<String>(
+                                          value: v,
+                                          child: Text(v),
+                                        ))
+                                    .toList(),
+                                onChanged: (v) =>
+                                    setState(() => _targetAudience = v ?? 'Students'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: 12),
+
+                      // ── Visibility ────────────────────────────────
+                      _label('Visibility'),
+                      _dropdown(
+                        hint: '',
+                        value: _visibility,
+                        items: const [
+                          DropdownMenuItem(value: 'PUBLIC',  child: Text('Public')),
+                          DropdownMenuItem(
+                              value: 'PRIVATE', child: Text('Private (School Only)')),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => _visibility = v ?? 'PUBLIC'),
+                      ),
+
+                      const SizedBox(height: 22),
+
+                      // ── Buttons ───────────────────────────────────
+                      Row(children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: widget.onClose,
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFF30363d)),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _uploading ? null : _upload,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2ea043),
+                              disabledBackgroundColor: const Color(0xFF30363d),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: Text(
+                              _uploading ? 'Uploading...' : 'Upload Resource',
+                              style: const TextStyle(
+                                  color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ]),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(text,
+        style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
+  );
+
+  InputDecoration _inputDecoration({String hint = '', int? maxLines}) =>
+      InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Color(0xFF6e7681)),
+        filled: true,
+        fillColor: const Color(0xFF0d1117),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFF21262d)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFF21262d)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFF2ea043), width: 1.5),
+        ),
+      );
+
+  Widget _input({
+    required String hint,
+    int maxLines = 1,
+    required void Function(String) onChanged,
+  }) =>
+      TextField(
+        onChanged: onChanged,
+        maxLines: maxLines,
+        style: const TextStyle(color: Colors.white, fontSize: 13),
+        decoration: _inputDecoration(hint: hint),
+      );
+
+  Widget _dropdown<T>({
+    required String hint,
+    required T? value,
+    required List<DropdownMenuItem<T>> items,
+    required void Function(T?) onChanged,
+  }) =>
+      DropdownButtonFormField<T>(
+        value: value,
+        decoration: _inputDecoration(),
+        hint: hint.isNotEmpty
+            ? Text(hint, style: const TextStyle(color: Color(0xFF6e7681), fontSize: 13))
+            : null,
+        dropdownColor: const Color(0xFF161b22),
+        style: const TextStyle(color: Colors.white, fontSize: 13),
+        items: items,
+        onChanged: onChanged,
+      );
+}
+
+/// Thin wrapper so teacher_home_screen.dart can still push this as a full screen.
+class UploadMaterialScreen extends StatelessWidget {
+  const UploadMaterialScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0d1117),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF161b22),
+        title: const Text('Upload Material',
+            style: TextStyle(color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Stack(
+        children: [
+          const SizedBox.expand(),
+          UploadModal(
+            onClose: () => Navigator.pop(context),
+            onUploaded: () => Navigator.pop(context),
+            toast: (msg, {String type = 'info'}) {
+              final colors = {
+                'success': const Color(0xFF2ea043),
+                'error':   const Color(0xFFf85149),
+                'info':    const Color(0xFF58a6ff),
+              };
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(msg),
+                backgroundColor: colors[type],
+                behavior: SnackBarBehavior.floating,
+              ));
+            },
+          ),
+        ],
+      ),
+    );
   }
 }
