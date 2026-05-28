@@ -5,7 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../core/services/api_service.dart'; // kApiBase, authHeaders()
+import '../../../core/services/api_service.dart';
 
 const _resourceTypes = [
   {'label': 'PDF Document',  'type': 'PDF',   'form': 'DOCUMENT'},
@@ -20,8 +20,6 @@ MediaType _mimeFor(String ext) {
     case 'pdf':  return MediaType('application', 'pdf');
     case 'doc':
     case 'docx': return MediaType('application', 'msword');
-    case 'ppt':
-    case 'pptx': return MediaType('application', 'vnd.ms-powerpoint');
     case 'mp4':  return MediaType('video', 'mp4');
     case 'png':  return MediaType('image', 'png');
     case 'jpg':
@@ -30,13 +28,23 @@ MediaType _mimeFor(String ext) {
   }
 }
 
-/// Shown as a full-screen overlay modal, matching the web upload modal.
+const _bg      = Color(0xFF0D1117);
+const _surface = Color(0xFF161B22);
+const _border  = Color(0xFF21262D);
+const _text    = Color(0xFFE6EDF3);
+const _muted   = Color(0xFF8B949E);
+const _subtle  = Color(0xFF6E7681);
+const _primary = Color(0xFF2EA043);
+const _danger  = Color(0xFFF85149);
+const _amber   = Color(0xFFE3A525);
+
 class UploadModal extends StatefulWidget {
   final VoidCallback onClose;
   final VoidCallback onUploaded;
   final void Function(String, {String type}) toast;
 
   const UploadModal({
+    super.key,
     required this.onClose,
     required this.onUploaded,
     required this.toast,
@@ -47,6 +55,7 @@ class UploadModal extends StatefulWidget {
 }
 
 class _UploadModalState extends State<UploadModal> {
+  // Form values
   String        _title          = '';
   String        _description    = '';
   String?       _categoryId;
@@ -61,29 +70,51 @@ class _UploadModalState extends State<UploadModal> {
   bool          _uploading      = false;
   double        _progress       = 0;
 
+  // Dropdown data
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _classes    = [];
+
+  // Teacher's school (fetched from profile)
+  String? _teacherSchoolId;
 
   @override
   void initState() {
     super.initState();
-    _loadDropdowns();
+    _loadAll();
   }
 
-  Future<void> _loadDropdowns() async {
+  Future<void> _loadAll() async {
     try {
       final headers = await authHeaders();
-      final catRes = await http.get(Uri.parse('$kApiBase/categories'), headers: headers);
-      final clsRes = await http.get(Uri.parse('$kApiBase/classes'),    headers: headers);
-      if (catRes.statusCode == 200) {
-        final data = jsonDecode(catRes.body);
-        setState(() => _categories = List<Map<String, dynamic>>.from(
-            data is List ? data : (data['data'] ?? [])));
+
+      // Fetch profile, categories, classes in parallel
+      final results = await Future.wait([
+        http.get(Uri.parse('$kApiBase/auth/me'),    headers: headers),
+        http.get(Uri.parse('$kApiBase/categories'), headers: headers),
+        http.get(Uri.parse('$kApiBase/classes'),    headers: headers),
+      ]);
+
+      // Profile → schoolId
+      if (results[0].statusCode == 200) {
+        final d = jsonDecode(results[0].body);
+        final id = d['schoolId']
+            ?? d['school']?['id']
+            ?? d['data']?['schoolId'];
+        if (id != null) setState(() => _teacherSchoolId = id.toString());
       }
-      if (clsRes.statusCode == 200) {
-        final data = jsonDecode(clsRes.body);
+
+      // Categories
+      if (results[1].statusCode == 200) {
+        final d = jsonDecode(results[1].body);
+        setState(() => _categories = List<Map<String, dynamic>>.from(
+            d is List ? d : (d['data'] ?? [])));
+      }
+
+      // Classes — sorted numerically
+      if (results[2].statusCode == 200) {
+        final d    = jsonDecode(results[2].body);
         final list = List<Map<String, dynamic>>.from(
-            data is List ? data : (data['data'] ?? []));
+            d is List ? d : (d['data'] ?? []));
         list.sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
         setState(() => _classes = list);
       }
@@ -104,7 +135,7 @@ class _UploadModalState extends State<UploadModal> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'mp4', 'png', 'jpg'],
+      allowedExtensions: ['pdf', 'doc', 'docx', 'mp4', 'png', 'jpg'],
       withData: true,
     );
     if (result != null && result.files.isNotEmpty) {
@@ -116,12 +147,20 @@ class _UploadModalState extends State<UploadModal> {
   }
 
   Future<void> _upload() async {
+    // Validation
     if (_title.trim().isEmpty) {
-      widget.toast('Please fill in the title.', type: 'error'); return;
+      widget.toast('Please enter a title.', type: 'error'); return;
+    }
+    if (_categoryId == null) {
+      widget.toast('Please select a subject.', type: 'error'); return;
+    }
+    if (_classId == null) {
+      widget.toast('Please select a form level.', type: 'error'); return;
     }
     if (_pickedFile == null || _fileBytes == null) {
       widget.toast('Please select a file.', type: 'error'); return;
     }
+
     setState(() { _uploading = true; _progress = 0; });
 
     try {
@@ -138,15 +177,21 @@ class _UploadModalState extends State<UploadModal> {
         ..fields['status']         = 'PUBLISHED'
         ..fields['targetAudience'] = _targetAudience
         ..fields['visibility']     = _visibility
+        ..fields['categoryId']     = _categoryId!
+        ..fields['classId']        = _classId!
+        ..fields['isPremium']      = 'false'
+        ..fields['price']          = '0'
         ..files.add(http.MultipartFile.fromBytes(
           'file',
           _fileBytes!,
-          filename: _pickedFile!.name,
+          filename:    _pickedFile!.name,
           contentType: _mimeFor(_pickedFile!.extension ?? ''),
         ));
 
-      if (_categoryId != null) request.fields['categoryId'] = _categoryId!;
-      if (_classId    != null) request.fields['classId']    = _classId!;
+      // Only send schoolId when visibility is PRIVATE
+      if (_visibility == 'PRIVATE' && _teacherSchoolId != null) {
+        request.fields['schoolId'] = _teacherSchoolId!;
+      }
 
       setState(() => _progress = 0.3);
       final streamed = await request.send();
@@ -164,7 +209,7 @@ class _UploadModalState extends State<UploadModal> {
     } catch (e) {
       widget.toast('Error: $e', type: 'error');
     } finally {
-      setState(() { _uploading = false; _progress = 0; });
+      if (mounted) setState(() { _uploading = false; _progress = 0; });
     }
   }
 
@@ -176,9 +221,9 @@ class _UploadModalState extends State<UploadModal> {
         child: Container(
           margin: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF161b22),
+            color: _surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF30363d)),
+            border: Border.all(color: const Color(0xFF30363D)),
           ),
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.88,
@@ -189,90 +234,67 @@ class _UploadModalState extends State<UploadModal> {
               // Header
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 18, 12, 0),
-                child: Row(
-                  children: [
-                    const Text('📤 Upload New Resource',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold)),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Color(0xFF6e7681)),
-                      onPressed: widget.onClose,
-                    ),
-                  ],
-                ),
+                child: Row(children: [
+                  const Text('📤 Upload New Resource',
+                      style: TextStyle(color: _text, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: _muted),
+                    onPressed: widget.onClose,
+                  ),
+                ]),
               ),
-              const Divider(color: Color(0xFF21262d)),
+              const Divider(color: _border),
+
               Flexible(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── File drop zone (tap to browse) ────────────
+
+                      // ── File picker ───────────────────────────────
                       GestureDetector(
                         onTap: _uploading ? null : _pickFile,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                        child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 28),
                           decoration: BoxDecoration(
-                            color: _pickedFile != null
-                                ? const Color(0xFF0d1117)
-                                : const Color(0xFF0d1117),
+                            color: _bg,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: _pickedFile != null
-                                  ? const Color(0xFF2ea043)
-                                  : const Color(0xFF30363d),
+                              color: _pickedFile != null ? _primary : const Color(0xFF30363D),
                               width: _pickedFile != null ? 2 : 1,
-                              style: BorderStyle.solid,
                             ),
                           ),
-                          child: Column(
-                            children: [
-                              Text(
-                                _pickedFile != null ? '📄' : '☁️',
-                                style: const TextStyle(fontSize: 30),
+                          child: Column(children: [
+                            Text(_pickedFile != null ? '📄' : '☁️',
+                                style: const TextStyle(fontSize: 30)),
+                            const SizedBox(height: 8),
+                            Text(
+                              _pickedFile != null ? _pickedFile!.name : 'Tap to browse a file',
+                              style: TextStyle(
+                                color: _pickedFile != null ? _primary : _muted,
+                                fontSize: 13,
+                                fontWeight: _pickedFile != null ? FontWeight.w600 : FontWeight.normal,
                               ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _pickedFile != null
+                                  ? '${(_pickedFile!.size / 1024 / 1024).toStringAsFixed(2)} MB'
+                                  : 'PDF, DOCX, MP4, Images',
+                              style: const TextStyle(color: _subtle, fontSize: 11),
+                            ),
+                            if (_pickedFile != null) ...[
                               const SizedBox(height: 8),
-                              Text(
-                                _pickedFile != null
-                                    ? _pickedFile!.name
-                                    : 'Tap to browse a file',
-                                style: TextStyle(
-                                  color: _pickedFile != null
-                                      ? const Color(0xFF2ea043)
-                                      : const Color(0xFF8b949e),
-                                  fontSize: 13,
-                                  fontWeight: _pickedFile != null
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                ),
+                              GestureDetector(
+                                onTap: () => setState(() { _pickedFile = null; _fileBytes = null; }),
+                                child: const Text('Remove file',
+                                    style: TextStyle(color: _danger, fontSize: 12)),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _pickedFile != null
-                                    ? '${(_pickedFile!.size / 1024 / 1024).toStringAsFixed(2)} MB'
-                                    : 'PDF, DOCX, MP4, Images',
-                                style: const TextStyle(
-                                    color: Color(0xFF6e7681), fontSize: 11),
-                              ),
-                              if (_pickedFile != null) ...[
-                                const SizedBox(height: 8),
-                                GestureDetector(
-                                  onTap: () => setState(
-                                      () { _pickedFile = null; _fileBytes = null; }),
-                                  child: const Text('Remove file',
-                                      style: TextStyle(
-                                          color: Color(0xFFf85149),
-                                          fontSize: 12)),
-                                ),
-                              ],
                             ],
-                          ),
+                          ]),
                         ),
                       ),
 
@@ -282,8 +304,8 @@ class _UploadModalState extends State<UploadModal> {
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
                             value: _progress,
-                            backgroundColor: const Color(0xFF30363d),
-                            valueColor: const AlwaysStoppedAnimation(Color(0xFF2ea043)),
+                            backgroundColor: const Color(0xFF30363D),
+                            valueColor: const AlwaysStoppedAnimation(_primary),
                             minHeight: 5,
                           ),
                         ),
@@ -293,126 +315,119 @@ class _UploadModalState extends State<UploadModal> {
 
                       // ── Title ─────────────────────────────────────
                       _label('Resource Title *'),
-                      _input(
-                        hint: 'e.g. Form 3 Biology Notes',
-                        onChanged: (v) => _title = v,
-                      ),
+                      _input(hint: 'e.g. Form 3 Biology Notes',
+                          onChanged: (v) => _title = v),
                       const SizedBox(height: 12),
 
                       // ── Description ───────────────────────────────
                       _label('Description'),
-                      _input(
-                        hint: 'Brief description',
-                        maxLines: 2,
-                        onChanged: (v) => _description = v,
-                      ),
+                      _input(hint: 'Brief description', maxLines: 2,
+                          onChanged: (v) => _description = v),
                       const SizedBox(height: 12),
 
-                      // ── Subject + Form ────────────────────────────
+                      // ── Subject + Form (both required) ────────────
                       Row(children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _label('Subject'),
-                              _dropdown(
-                                hint: 'Select subject',
-                                value: _categoryId,
-                                items: _categories
-                                    .map((c) => DropdownMenuItem<String>(
-                                          value: c['id']?.toString(),
-                                          child: Text(c['name']?.toString() ?? ''),
-                                        ))
-                                    .toList(),
-                                onChanged: (v) =>
-                                    setState(() => _categoryId = v),
-                              ),
-                            ],
-                          ),
-                        ),
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _label('Subject *'),
+                            _dropdown<String>(
+                              hint: 'Select subject',
+                              value: _categoryId,
+                              items: _categories.map((c) => DropdownMenuItem<String>(
+                                value: c['id']?.toString(),
+                                child: Text(c['name']?.toString() ?? ''),
+                              )).toList(),
+                              onChanged: (v) => setState(() => _categoryId = v),
+                              hasError: _categoryId == null,
+                            ),
+                          ],
+                        )),
                         const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _label('Form'),
-                              _dropdown(
-                                hint: 'Select form',
-                                value: _classId,
-                                items: _classes
-                                    .map((c) => DropdownMenuItem<String>(
-                                          value: c['id']?.toString(),
-                                          child: Text(c['name']?.toString() ?? ''),
-                                        ))
-                                    .toList(),
-                                onChanged: (v) => setState(() => _classId = v),
-                              ),
-                            ],
-                          ),
-                        ),
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _label('Form Level *'),
+                            _dropdown<String>(
+                              hint: 'Select form',
+                              value: _classId,
+                              items: _classes.map((c) => DropdownMenuItem<String>(
+                                value: c['id']?.toString(),
+                                child: Text(c['name']?.toString() ?? ''),
+                              )).toList(),
+                              onChanged: (v) => setState(() => _classId = v),
+                              hasError: _classId == null,
+                            ),
+                          ],
+                        )),
                       ]),
                       const SizedBox(height: 12),
 
                       // ── Type + Audience ───────────────────────────
                       Row(children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _label('File Type'),
-                              _dropdown(
-                                hint: '',
-                                value: _selectedLabel,
-                                items: _resourceTypes
-                                    .map((t) => DropdownMenuItem<String>(
-                                          value: t['label'],
-                                          child: Text(t['label']!),
-                                        ))
-                                    .toList(),
-                                onChanged: (v) {
-                                  if (v != null) _handleTypeChange(v);
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _label('File Type'),
+                            _dropdown<String>(
+                              hint: '',
+                              value: _selectedLabel,
+                              items: _resourceTypes.map((t) => DropdownMenuItem<String>(
+                                value: t['label'],
+                                child: Text(t['label']!),
+                              )).toList(),
+                              onChanged: (v) { if (v != null) _handleTypeChange(v); },
+                            ),
+                          ],
+                        )),
                         const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _label('Audience'),
-                              _dropdown(
-                                hint: '',
-                                value: _targetAudience,
-                                items: ['Students', 'Teachers', 'Both']
-                                    .map((v) => DropdownMenuItem<String>(
-                                          value: v,
-                                          child: Text(v),
-                                        ))
-                                    .toList(),
-                                onChanged: (v) =>
-                                    setState(() => _targetAudience = v ?? 'Students'),
-                              ),
-                            ],
-                          ),
-                        ),
+                        Expanded(child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _label('Audience'),
+                            _dropdown<String>(
+                              hint: '',
+                              value: _targetAudience,
+                              items: ['Students', 'Teachers', 'Both'].map((v) =>
+                                  DropdownMenuItem<String>(value: v, child: Text(v))).toList(),
+                              onChanged: (v) => setState(() => _targetAudience = v ?? 'Students'),
+                            ),
+                          ],
+                        )),
                       ]),
                       const SizedBox(height: 12),
 
                       // ── Visibility ────────────────────────────────
                       _label('Visibility'),
-                      _dropdown(
+                      _dropdown<String>(
                         hint: '',
                         value: _visibility,
                         items: const [
                           DropdownMenuItem(value: 'PUBLIC',  child: Text('Public')),
-                          DropdownMenuItem(
-                              value: 'PRIVATE', child: Text('Private (School Only)')),
+                          DropdownMenuItem(value: 'PRIVATE', child: Text('Private (School Only)')),
                         ],
-                        onChanged: (v) =>
-                            setState(() => _visibility = v ?? 'PUBLIC'),
+                        onChanged: (v) => setState(() => _visibility = v ?? 'PUBLIC'),
                       ),
+
+                      // Info banner when PRIVATE
+                      if (_visibility == 'PRIVATE') ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3A2A1A),
+                            border: Border.all(color: _amber),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _teacherSchoolId != null
+                                ? '🏫 Visible only to your school.'
+                                : '⚠️ School not found on your profile.',
+                            style: const TextStyle(color: _amber, fontSize: 12),
+                          ),
+                        ),
+                      ],
 
                       const SizedBox(height: 22),
 
@@ -422,8 +437,8 @@ class _UploadModalState extends State<UploadModal> {
                           child: OutlinedButton(
                             onPressed: widget.onClose,
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Color(0xFF30363d)),
-                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Color(0xFF30363D)),
+                              foregroundColor: _text,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8)),
@@ -436,8 +451,8 @@ class _UploadModalState extends State<UploadModal> {
                           child: ElevatedButton(
                             onPressed: _uploading ? null : _upload,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2ea043),
-                              disabledBackgroundColor: const Color(0xFF30363d),
+                              backgroundColor: _primary,
+                              disabledBackgroundColor: _border,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8)),
@@ -463,42 +478,35 @@ class _UploadModalState extends State<UploadModal> {
 
   Widget _label(String text) => Padding(
     padding: const EdgeInsets.only(bottom: 6),
-    child: Text(text,
-        style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
+    child: Text(text, style: const TextStyle(color: _muted, fontSize: 12)),
   );
 
-  InputDecoration _inputDecoration({String hint = '', int? maxLines}) =>
-      InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF6e7681)),
-        filled: true,
-        fillColor: const Color(0xFF0d1117),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF21262d)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF21262d)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF2ea043), width: 1.5),
-        ),
-      );
+  InputDecoration _inputDeco({String hint = '', bool hasError = false}) => InputDecoration(
+    hintText: hint,
+    hintStyle: const TextStyle(color: _subtle),
+    filled: true,
+    fillColor: _bg,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: hasError ? _danger : _border),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: hasError ? _danger : _border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: _primary, width: 1.5),
+    ),
+  );
 
-  Widget _input({
-    required String hint,
-    int maxLines = 1,
-    required void Function(String) onChanged,
-  }) =>
+  Widget _input({required String hint, int maxLines = 1, required void Function(String) onChanged}) =>
       TextField(
         onChanged: onChanged,
         maxLines: maxLines,
-        style: const TextStyle(color: Colors.white, fontSize: 13),
-        decoration: _inputDecoration(hint: hint),
+        style: const TextStyle(color: _text, fontSize: 13),
+        decoration: _inputDeco(hint: hint),
       );
 
   Widget _dropdown<T>({
@@ -506,55 +514,53 @@ class _UploadModalState extends State<UploadModal> {
     required T? value,
     required List<DropdownMenuItem<T>> items,
     required void Function(T?) onChanged,
+    bool hasError = false,
   }) =>
       DropdownButtonFormField<T>(
         value: value,
-        decoration: _inputDecoration(),
+        decoration: _inputDeco(hasError: hasError),
         hint: hint.isNotEmpty
-            ? Text(hint, style: const TextStyle(color: Color(0xFF6e7681), fontSize: 13))
+            ? Text(hint, style: const TextStyle(color: _subtle, fontSize: 13))
             : null,
-        dropdownColor: const Color(0xFF161b22),
-        style: const TextStyle(color: Colors.white, fontSize: 13),
+        dropdownColor: _surface,
+        style: const TextStyle(color: _text, fontSize: 13),
         items: items,
         onChanged: onChanged,
       );
 }
 
-/// Thin wrapper so teacher_home_screen.dart can still push this as a full screen.
+/// Thin wrapper for pushing as a full screen from teacher_home_screen.dart
 class UploadMaterialScreen extends StatelessWidget {
   const UploadMaterialScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0d1117),
+      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF161b22),
-        title: const Text('Upload Material',
-            style: TextStyle(color: Colors.white)),
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: _surface,
+        title: const Text('Upload Material', style: TextStyle(color: _text)),
+        iconTheme: const IconThemeData(color: _text),
       ),
-      body: Stack(
-        children: [
-          const SizedBox.expand(),
-          UploadModal(
-            onClose: () => Navigator.pop(context),
-            onUploaded: () => Navigator.pop(context),
-            toast: (msg, {String type = 'info'}) {
-              final colors = {
-                'success': const Color(0xFF2ea043),
-                'error':   const Color(0xFFf85149),
-                'info':    const Color(0xFF58a6ff),
-              };
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(msg),
-                backgroundColor: colors[type],
-                behavior: SnackBarBehavior.floating,
-              ));
-            },
-          ),
-        ],
-      ),
+      body: Stack(children: [
+        const SizedBox.expand(),
+        UploadModal(
+          onClose:    () => Navigator.pop(context),
+          onUploaded: () => Navigator.pop(context),
+          toast: (msg, {String type = 'info'}) {
+            final colors = {
+              'success': _primary,
+              'error':   _danger,
+              'info':    const Color(0xFF58A6FF),
+            };
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(msg),
+              backgroundColor: colors[type],
+              behavior: SnackBarBehavior.floating,
+            ));
+          },
+        ),
+      ]),
     );
   }
 }
