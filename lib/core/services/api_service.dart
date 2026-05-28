@@ -2,7 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const String kApiBase = String.fromEnvironment(
   'API_BASE',
-  defaultValue: 'http://127.0.0.1:3000',
+  defaultValue: 'https://online-library-api-muuz.onrender.com',
 );
 
 Future<Map<String, String>> authHeaders() async {

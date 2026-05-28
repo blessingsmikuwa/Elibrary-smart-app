@@ -5,7 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'api_service.dart'; // kApiBase, authHeaders()
+import '../../../core/services/api_service.dart'; // kApiBase, authHeaders()
 
 const _resourceTypes = [
   {'label': 'PDF Document',  'type': 'PDF',   'form': 'DOCUMENT'},

@@ -7,7 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'api_service.dart';
+import '../../../core/services/api_service.dart';
+import 'payment_result_screen.dart'; // PaymentResultScreen
 
 // ─── Offline service ──────────────────────────────────────────────────────────
 
@@ -243,13 +244,26 @@ class _BooksScreenState extends State<BooksScreen> {
 
       Set<String> purchased = {};
       try {
+        // ── 1. Load locally-cached purchases (instant, set by PaymentResultScreen) ──
+        final prefs    = await SharedPreferences.getInstance();
+        final localRaw = prefs.getString('purchased_resource_ids') ?? '[]';
+        purchased      = Set<String>.from(jsonDecode(localRaw) as List);
+
+        // ── 2. Merge with server-authoritative list ──────────────────────────
         final pr = await http.get(
           Uri.parse('$kApiBase/payment/my-purchases'),
           headers: headers,
         );
         if (pr.statusCode == 200) {
           final pd = jsonDecode(pr.body) as Map<String, dynamic>;
-          purchased = Set<String>.from(pd['purchased'] as List? ?? []);
+          final serverIds = Set<String>.from(pd['purchased'] as List? ?? []);
+          purchased = {...purchased, ...serverIds};
+
+          // Keep local cache in sync with server truth
+          await prefs.setString(
+            'purchased_resource_ids',
+            jsonEncode(purchased.toList()),
+          );
         }
       } catch (_) {}
 
@@ -285,9 +299,21 @@ class _BooksScreenState extends State<BooksScreen> {
   }
 
   // ── Purchase ───────────────────────────────────────────────────────────────
+  //
+  // Flow:
+  //   1. Call backend → get checkoutUrl + txRef
+  //   2. Open PayChangu checkout in external browser
+  //   3. When browser closes (user returns to app), navigate to
+  //      PaymentResultScreen which re-verifies the payment and shows status.
+  //   4. On pop from PaymentResultScreen, refresh the books list so newly
+  //      purchased books unlock immediately.
+  // ──────────────────────────────────────────────────────────────────────────
 
   Future<void> _purchase(_Book book) async {
     setState(() { _purchasing = true; _error = null; });
+
+    String? txRef;
+
     try {
       final headers = await authHeaders();
       final res = await http.post(
@@ -295,19 +321,45 @@ class _BooksScreenState extends State<BooksScreen> {
         headers: headers,
         body: jsonEncode({'resourceId': book.id, 'amount': book.price}),
       );
-      if (res.statusCode != 200) {
-        final d = jsonDecode(res.body) as Map<String, dynamic>;
-        throw Exception(d['message']?.toString() ?? 'Payment failed');
+
+      // Surface a clean error message from the server if available
+      if (res.statusCode != 200 && res.statusCode != 201) {
+        Map<String, dynamic> d = {};
+        try { d = jsonDecode(res.body) as Map<String, dynamic>; } catch (_) {}
+        throw Exception(d['message']?.toString() ?? 'Payment initiation failed (${res.statusCode})');
       }
+
       final d   = jsonDecode(res.body) as Map<String, dynamic>;
       final url = d['checkoutUrl']?.toString() ?? d['url']?.toString();
-      if (url != null) {
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      } else {
-        throw Exception('No checkout URL returned');
+      txRef     = d['transactionReference']?.toString();
+
+      if (url == null || url.isEmpty) {
+        throw Exception('No checkout URL returned from server');
+      }
+
+      // ── Open the PayChangu checkout page ──────────────────────────────────
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+
+      // ── Browser has been closed / user switched back to the app ──────────
+      // Navigate to the result screen to verify & show outcome.
+      if (mounted) {
+        final refreshNeeded = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PaymentResultScreen(
+              txRef:      txRef ?? '',
+              resourceId: book.id,
+            ),
+          ),
+        );
+
+        // Re-fetch the book list so newly unlocked books appear immediately
+        if (refreshNeeded == true && mounted) {
+          await _fetchAll();
+        }
       }
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _purchasing = false);
     }

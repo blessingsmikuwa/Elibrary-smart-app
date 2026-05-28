@@ -7,12 +7,10 @@ import '../../../core/theme/app_theme.dart';
 import '../../student/screens/student_home_screen.dart';
 import '../../teacher/screens/teacher_home_screen.dart';
 import '../screens/signup_screen.dart';
+import '../../../core/services/api_service.dart'; 
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const String _kApiBase = String.fromEnvironment(
-  'API_BASE',
-  defaultValue: 'http://127.0.0.1:3000', 
-);
+// kApiBase now comes from api_service.dart
 
 const String _kAccessTokenKey = 'accessToken';
 const String _kRefreshTokenKey = 'refreshToken';
@@ -52,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
     required String password,
     required UserRole role,
   }) async {
-    final uri = Uri.parse('$_kApiBase/auth/login');
+    final uri = Uri.parse('$kApiBase/auth/login'); // ← was $_kApiBase
 
     final response = await http
         .post(
@@ -85,8 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
       throw Exception('Admins must use the admin portal.');
     }
 
-    final expectedRole =
-        role == UserRole.student ? 'STUDENT' : 'TEACHER';
+    final expectedRole = role == UserRole.student ? 'STUDENT' : 'TEACHER';
 
     if (serverRole != expectedRole) {
       throw Exception(
@@ -126,16 +123,12 @@ class _LoginScreenState extends State<LoginScreen> {
       if (role == 'STUDENT') {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => const StudentHomeScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const StudentHomeScreen()),
         );
       } else if (role == 'TEACHER') {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => const TeacherHomeScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const TeacherHomeScreen()),
         );
       }
     } on Exception catch (e) {
@@ -163,8 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const SizedBox(height: 40),
 
-                Icon(Icons.menu_book_rounded,
-                    size: 80, color: primaryColor),
+                Icon(Icons.menu_book_rounded, size: 80, color: primaryColor),
 
                 const SizedBox(height: 16),
 
@@ -255,9 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => const SignupScreen(),
-                      ),
+                      MaterialPageRoute(builder: (_) => const SignupScreen()),
                     );
                   },
                   child: const Text('Create account'),

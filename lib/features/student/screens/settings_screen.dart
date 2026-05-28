@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'api_service.dart';
+import '../../../core/services/api_service.dart';
 import '../../auth/screens/login_screen.dart'; 
 
 class SettingsScreen extends StatefulWidget {

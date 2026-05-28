@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-
-import 'api_service.dart';
+import 'package:elibrary_smartapp/features/student/screens/structured_tests_tab.dart';
+import '../../../core/services/api_service.dart';
 
 // ─── Subject / topic map (mirrors web app) ────────────────────────────────────
 
@@ -208,6 +208,9 @@ Future<void> _logAttempt({
 
 class QuizzesScreen extends StatefulWidget {
   const QuizzesScreen({super.key});
+
+    static void jumpToTab(int index) => _QuizzesScreenState._jump(index);
+
   @override State<QuizzesScreen> createState() => _QuizzesScreenState();
 }
 
@@ -215,10 +218,14 @@ class _QuizzesScreenState extends State<QuizzesScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
 
+  static _QuizzesScreenState? _instance;
+  static void _jump(int i) => _instance?._tabs.animateTo(i);
+
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 5, vsync: this);
+    _instance = this;
+    _tabs = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -243,6 +250,7 @@ class _QuizzesScreenState extends State<QuizzesScreen>
             Tab(text: '🤖 AI Quiz'),
             Tab(text: '💾 Saved AI'),
             Tab(text: '👩‍🏫 Teacher'),
+            Tab(text: '📝 Tests'),
             Tab(text: '📊 Progress'),
             Tab(text: '🕐 History'),
           ],
@@ -250,10 +258,11 @@ class _QuizzesScreenState extends State<QuizzesScreen>
       ),
       body: TabBarView(
         controller: _tabs,
-        children: const [
+        children: [
           _AITab(),
           _SavedAITab(),
           _TeacherTab(),
+          StructuredTestsTab(),
           _ProgressTab(),
           _HistoryTab(),
         ],

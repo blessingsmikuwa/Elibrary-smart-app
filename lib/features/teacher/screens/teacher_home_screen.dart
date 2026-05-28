@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/theme/app_theme.dart';
-import '../../student/screens/api_service.dart';
+import '../../../core/services/api_service.dart';
 import 'upload_material_screen.dart';
 import 'teaching_materials_screen.dart';
 import 'create_quiz_screen.dart';
 import 'student_progress_screen.dart';
 import 'teacher_profile_screen.dart';
+import 'structured_tests_teacher_screen.dart';
+import '../../../core/services/api_service.dart';
+
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
 
@@ -16,6 +19,7 @@ const _bg      = Color(0xFF0D1117);
 const _surface = Color(0xFF161B22);
 const _border  = Color(0xFF21262D);
 const _primary = Color(0xFF2EA043);
+const _green   = Color(0xFF2EA043);
 const _text    = Color(0xFFE6EDF3);
 const _muted   = Color(0xFF8B949E);
 const _subtle  = Color(0xFF6E7681);
@@ -96,7 +100,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
 
   void _goTo(int index) => setState(() => _currentIndex = index);
 
-  final List<String> _titles = ['Dashboard', 'Materials', 'Create Quiz', 'Progress', 'Profile'];
+  final List<String> _titles = ['Dashboard','Materials','Create Quiz','Progress','Tests','Profile'];
 
   Widget _screen() {
     switch (_currentIndex) {
@@ -104,7 +108,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       case 1: return TeachingMaterialsScreen();
       case 2: return CreateQuizScreen();
       case 3: return StudentProgressScreen();
-      case 4: return TeacherProfileScreen();
+      case 4: return const StructuredTestsTeacherScreen();
+      case 5: return TeacherProfileScreen();
       default: return _DashboardContent(onNavigate: _goTo);
     }
   }
@@ -136,6 +141,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
             BottomNavigationBarItem(icon: Icon(Icons.book),         activeIcon: Icon(Icons.book,         color: _primary), label: 'Materials'),
             BottomNavigationBarItem(icon: Icon(Icons.quiz),         activeIcon: Icon(Icons.quiz,         color: _primary), label: 'Create Quiz'),
             BottomNavigationBarItem(icon: Icon(Icons.bar_chart),    activeIcon: Icon(Icons.bar_chart,    color: _primary), label: 'Progress'),
+            BottomNavigationBarItem(icon: Icon(Icons.edit_note),    activeIcon: Icon(Icons.edit_note,    color: _primary), label: 'Tests'),
             BottomNavigationBarItem(icon: Icon(Icons.person),       activeIcon: Icon(Icons.person,       color: _primary), label: 'Profile'),
           ],
         ),
@@ -190,7 +196,6 @@ class _DashboardContentState extends State<_DashboardContent> {
         final data = jsonDecode(results[1].body);
         final arr  = data is Map ? (data['data'] as List? ?? []) : (data as List? ?? []);
         final allRes = arr.map((e) => _Resource.fromJson(e as Map<String, dynamic>)).toList();
-        // filter to this teacher's uploads (match uploaderId)
         _resources = allRes.where((r) {
           final raw = arr.firstWhere(
             (e) => (e as Map<String, dynamic>)['id']?.toString() == r.id,
@@ -217,6 +222,171 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   String get _displayName => '$_firstName $_lastName'.trim();
+
+  // ─── Toast helper ────────────────────────────────────────────────────────────
+
+  void _toast(BuildContext context, String msg, {bool error = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: error ? _red : _green,
+    ));
+  }
+
+  // ─── Add Student dialog ──────────────────────────────────────────────────────
+
+  void _showAddStudentDialog(BuildContext context) {
+    final firstCtrl = TextEditingController();
+    final lastCtrl  = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final passCtrl  = TextEditingController();
+    bool saving = false;
+    DateTime? dob = DateTime(2008, 1, 1);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Dialog(
+          backgroundColor: _surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: _border),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Text('👤 Add Student', style: TextStyle(color: _text,
+                    fontSize: 16, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                IconButton(icon: const Icon(Icons.close, color: _muted),
+                  onPressed: () => Navigator.pop(ctx)),
+              ]),
+              const Divider(color: _border),
+              const SizedBox(height: 4),
+              _dialogField('First Name', firstCtrl),
+              const SizedBox(height: 10),
+              _dialogField('Last Name', lastCtrl),
+              const SizedBox(height: 10),
+              _dialogField('Email', emailCtrl, keyboard: TextInputType.emailAddress),
+              const SizedBox(height: 10),
+              _dialogField('Password', passCtrl, obscure: true),
+              const SizedBox(height: 10),
+              // Date of birth picker
+              const Text('Date of Birth', style: TextStyle(color: _subtle, fontSize: 11)),
+              const SizedBox(height: 4),
+              GestureDetector(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: ctx,
+                    initialDate: dob ?? DateTime(2008),
+                    firstDate: DateTime(1990),
+                    lastDate: DateTime.now(),
+                    builder: (c, child) => Theme(
+                      data: ThemeData.dark().copyWith(
+                        colorScheme: const ColorScheme.dark(primary: _green),
+                      ),
+                      child: child!,
+                    ),
+                  );
+                  if (picked != null) setS(() => dob = picked);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(color: _bg,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _border)),
+                  child: Row(children: [
+                    const Icon(Icons.calendar_today, color: _muted, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      dob != null
+                          ? '${dob!.year}-${dob!.month.toString().padLeft(2,'0')}-${dob!.day.toString().padLeft(2,'0')}'
+                          : 'Select date',
+                      style: const TextStyle(color: _text, fontSize: 13),
+                    ),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(width: double.infinity, child: ElevatedButton(
+                onPressed: saving ? null : () async {
+                  if (firstCtrl.text.trim().isEmpty || emailCtrl.text.trim().isEmpty
+                      || passCtrl.text.trim().isEmpty) {
+                    _toast(context, 'First name, email and password are required.', error: true);
+                    return;
+                  }
+                  setS(() => saving = true);
+                  try {
+                    final h = await authHeaders();
+                    final r = await http.post(
+                      Uri.parse('$kApiBase/profiles'),
+                      headers: h,
+                      body: jsonEncode({
+                        'firstName':   firstCtrl.text.trim(),
+                        'lastName':    lastCtrl.text.trim(),
+                        'email':       emailCtrl.text.trim(),
+                        'password':    passCtrl.text,
+                        'role':        'STUDENT',
+                        'dateOfBirth': dob != null
+                            ? '${dob!.year}-${dob!.month.toString().padLeft(2,'0')}-${dob!.day.toString().padLeft(2,'0')}'
+                            : null,
+                      }),
+                    );
+                    if (r.statusCode < 300) {
+                      Navigator.pop(ctx);
+                      _toast(context, '${firstCtrl.text} added successfully!');
+                    } else {
+                      final d = jsonDecode(r.body);
+                      _toast(context, d['message']?.toString() ?? 'Failed.', error: true);
+                    }
+                  } catch (e) {
+                    _toast(context, 'Error: $e', error: true);
+                  } finally {
+                    setS(() => saving = false);
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: _green,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                child: Text(saving ? 'Adding…' : 'Add Student',
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+              )),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Dialog field helper ─────────────────────────────────────────────────────
+
+  Widget _dialogField(String label, TextEditingController ctrl,
+      {TextInputType keyboard = TextInputType.text, bool obscure = false}) =>
+    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(color: _subtle, fontSize: 11)),
+      const SizedBox(height: 4),
+      TextField(
+        controller: ctrl,
+        obscureText: obscure,
+        keyboardType: keyboard,
+        style: const TextStyle(color: _text, fontSize: 13),
+        decoration: InputDecoration(
+          hintText: label,
+          hintStyle: const TextStyle(color: _subtle),
+          filled: true, fillColor: _bg,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: _border)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: _border)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: _green, width: 1.5)),
+        ),
+      ),
+    ]);
+
+  // ─── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -266,6 +436,12 @@ class _DashboardContentState extends State<_DashboardContent> {
                   onTap: () => Navigator.push(context,
                       MaterialPageRoute(builder: (_) => const UploadMaterialScreen())),
                 ),
+                _BannerBtn(
+                  label: '👤 Add Student',
+                  bg: _blue.withValues(alpha: 0.15), fg: _blue,
+                  border: _blue,
+                  onTap: () => _showAddStudentDialog(context),
+                ),
               ]),
             ]),
           ),
@@ -281,7 +457,7 @@ class _DashboardContentState extends State<_DashboardContent> {
 
           const SizedBox(height: 16),
 
-          // ── Student progress banner (mirrors web)
+          // ── Student progress banner
           if (_stats != null && _stats!.totalStudents > 0)
             GestureDetector(
               onTap: () => widget.onNavigate(3),

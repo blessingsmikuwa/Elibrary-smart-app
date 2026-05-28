@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import "../../../core/services/api_service.dart";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 class _C {
@@ -31,8 +32,6 @@ const Map<String, Color> _subjectColors = {
   'Civic Education':  Color(0xFF56D364),
   'Computer Studies': Color(0xFF79C0FF),
 };
-
-const String _api = 'http://127.0.0.1:3000';
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 class _Attempt {
@@ -154,7 +153,7 @@ class _StudentProgressScreenState extends State<StudentProgressScreen> {
         return;
       }
       final res = await http.get(
-        Uri.parse('$_api/quizzes/teacher/attempts'),
+        Uri.parse('$kApiBase/quizzes/teacher/attempts'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 10));
 

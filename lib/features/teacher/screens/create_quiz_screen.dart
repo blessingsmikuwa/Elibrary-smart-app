@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/services/api_service.dart';
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 class _C {
@@ -71,8 +72,6 @@ class _Quiz {
 _Question _blankQ() => _Question(id:'${DateTime.now().microsecondsSinceEpoch}-${Object().hashCode}');
 _Quiz _blankQuiz() => _Quiz();
 
-const String _api = 'http://localhost:3000';
-
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 class CreateQuizScreen extends StatefulWidget {
   const CreateQuizScreen({super.key});
@@ -105,7 +104,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
   Future<void> _loadQuizzes() async {
     setState(() => _loadingList=true);
     try {
-      final res = await http.get(Uri.parse('$_api/quizzes/mine'), headers: await _headers());
+      final res = await http.get(Uri.parse('$kApiBase/quizzes/mine'), headers: await _headers());
       if (res.statusCode < 300) setState(() => _savedQuizzes = List<Map<String,dynamic>>.from(jsonDecode(res.body)));
     } catch (_) {}
     finally { setState(() => _loadingList=false); }
@@ -113,7 +112,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
 
   Future<void> _fetchSchools() async {
     try {
-      final res = await http.get(Uri.parse('$_api/school'), headers: await _headers());
+      final res = await http.get(Uri.parse('$kApiBase/school'), headers: await _headers());
       if (res.statusCode < 300) setState(() => _schools = List<Map<String,dynamic>>.from(jsonDecode(res.body)));
     } catch (_) {}
   }
@@ -132,7 +131,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
         'mode':_mode,'status':'published',
         'questions':_quiz.questions.map((q) => q.toJson()).toList(),
       });
-      final res = await http.post(Uri.parse('$_api/quizzes'), headers: await _headers(), body: body);
+      final res = await http.post(Uri.parse('$kApiBase/quizzes'), headers: await _headers(), body: body);
       if (res.statusCode >= 300) {
         final d = jsonDecode(res.body); throw Exception(d['message'] ?? 'Failed to save quiz');
       }
@@ -153,7 +152,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
   Future<void> _exportPdf(dynamic quizId) async {
     try {
       final res = await http.get(
-        Uri.parse('$_api/quizzes/$quizId/export/pdf'),
+        Uri.parse('$kApiBase/quizzes/$quizId/export/pdf'),
         headers: await _headers(),
       );
       if (res.statusCode >= 300) {
@@ -178,7 +177,7 @@ class _CreateQuizScreenState extends State<CreateQuizScreen> {
 
   Future<void> _deleteQuiz(dynamic id) async {
     try {
-      final res = await http.delete(Uri.parse('$_api/quizzes/$id'), headers: await _headers());
+      final res = await http.delete(Uri.parse('$kApiBase/quizzes/$id'), headers: await _headers());
       if (res.statusCode >= 300) throw Exception('Failed to delete quiz');
       setState(() => _savedQuizzes = _savedQuizzes.where((q) => q['id'] != id).toList());
       _showToast('Quiz deleted.');
@@ -670,7 +669,7 @@ class _SavedQuizCardState extends State<_SavedQuizCard> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('accessToken');
       final res = await http.get(
-        Uri.parse('$_api/quizzes/$quizId/export/pdf'),
+        Uri.parse('$kApiBase/quizzes/$quizId/export/pdf'),
         headers: {'Authorization': 'Bearer $token'},
       );
       if (res.statusCode >= 300) {

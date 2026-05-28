@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
-import 'api_service.dart';
+import '../../../core/services/api_service.dart';
 
 // ─── Model ────────────────────────────────────────────────────────────────────
 

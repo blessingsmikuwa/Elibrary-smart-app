@@ -8,8 +8,8 @@ import '../../student/screens/student_home_screen.dart';
 import '../../teacher/screens/teacher_home_screen.dart';
 
 const String _apiBaseUrl = String.fromEnvironment(
-  'API_BASE_URL',
-  defaultValue: 'http://10.0.2.2:3000',
+  'API_BASE', 
+  defaultValue: 'https://online-library-api-muuz.onrender.com/', 
 );
 
 enum SignupRole { student, teacher }

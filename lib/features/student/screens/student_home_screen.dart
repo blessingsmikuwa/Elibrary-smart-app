@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/theme/app_theme.dart';
-import 'api_service.dart';
+import '../../../core/services/api_service.dart';
 import 'books_screen.dart';
 import 'past_papers_screen.dart';
 import 'quizzes_screen.dart';
@@ -122,9 +122,9 @@ class _QuizAttempt {
   const _QuizAttempt({required this.subject, this.topic, required this.percentage});
 
   factory _QuizAttempt.fromJson(Map<String, dynamic> j) => _QuizAttempt(
-    subject:    j['subject']?.toString()              ?? '',
+    subject:    j['subject']?.toString()           ?? '',
     topic:      j['topic']?.toString(),
-    percentage: (j['percentage'] as num?)?.toInt()    ?? 0,
+    percentage: (j['percentage'] as num?)?.toInt() ?? 0,
   );
 }
 
@@ -158,11 +158,11 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: _selectTab,
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard_outlined),      selectedIcon: Icon(Icons.dashboard_rounded),      label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.local_library_outlined),  selectedIcon: Icon(Icons.local_library_rounded),  label: 'Books'),
-          NavigationDestination(icon: Icon(Icons.assignment_outlined),     selectedIcon: Icon(Icons.assignment_rounded),     label: 'Papers'),
-          NavigationDestination(icon: Icon(Icons.edit_note_outlined),      selectedIcon: Icon(Icons.edit_note_rounded),      label: 'Quizzes'),
-          NavigationDestination(icon: Icon(Icons.settings_outlined),       selectedIcon: Icon(Icons.settings_rounded),       label: 'Settings'),
+          NavigationDestination(icon: Icon(Icons.dashboard_outlined),     selectedIcon: Icon(Icons.dashboard_rounded),     label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.local_library_outlined), selectedIcon: Icon(Icons.local_library_rounded), label: 'Books'),
+          NavigationDestination(icon: Icon(Icons.assignment_outlined),    selectedIcon: Icon(Icons.assignment_rounded),    label: 'Papers'),
+          NavigationDestination(icon: Icon(Icons.edit_note_outlined),     selectedIcon: Icon(Icons.edit_note_rounded),     label: 'Quizzes'),
+          NavigationDestination(icon: Icon(Icons.settings_outlined),      selectedIcon: Icon(Icons.settings_rounded),      label: 'Settings'),
         ],
       ),
     );
@@ -178,13 +178,13 @@ class _StudentDashboard extends StatefulWidget {
 }
 
 class _StudentDashboardState extends State<_StudentDashboard> {
-  bool               _loading    = true;
-  String?            _error;
-  String             _firstName  = 'Student';
-  String             _schoolName = '';
-  _DashboardStats    _stats      = _DashboardStats.empty;
-  List<_ActivityItem> _activity  = [];
-  List<_QuizAttempt>  _attempts  = [];
+  bool                _loading    = true;
+  String?             _error;
+  String              _firstName  = 'Student';
+  String              _schoolName = '';
+  _DashboardStats     _stats      = _DashboardStats.empty;
+  List<_ActivityItem> _activity   = [];
+  List<_QuizAttempt>  _attempts   = [];
 
   @override
   void initState() { super.initState(); _fetchAll(); }
@@ -194,20 +194,21 @@ class _StudentDashboardState extends State<_StudentDashboard> {
     try {
       final headers = await authHeaders();
       final results = await Future.wait([
-        http.get(Uri.parse('$kApiBase/profiles/me'),              headers: headers),
-        http.get(Uri.parse('$kApiBase/activity/me/stats'),        headers: headers),
-        http.get(Uri.parse('$kApiBase/activity/me'),              headers: headers),
-        http.get(Uri.parse('$kApiBase/quizzes/attempts/mine'),    headers: headers),
+        http.get(Uri.parse('$kApiBase/profiles/me'),           headers: headers),
+        http.get(Uri.parse('$kApiBase/activity/me/stats'),     headers: headers),
+        http.get(Uri.parse('$kApiBase/activity/me'),           headers: headers),
+        http.get(Uri.parse('$kApiBase/quizzes/attempts/mine'), headers: headers),
       ]);
       if (!mounted) return;
 
       if (results[0].statusCode < 300) {
-        final p  = jsonDecode(results[0].body) as Map<String, dynamic>;
+        final p = jsonDecode(results[0].body) as Map<String, dynamic>;
         _firstName  = p['firstName'] as String? ?? 'Student';
         _schoolName = (p['school'] as Map<String, dynamic>?)?['name'] as String? ?? '';
       }
       if (results[1].statusCode < 300) {
-        _stats = _DashboardStats.fromJson(jsonDecode(results[1].body) as Map<String, dynamic>);
+        _stats = _DashboardStats.fromJson(
+            jsonDecode(results[1].body) as Map<String, dynamic>);
       }
       if (results[2].statusCode < 300) {
         _activity = (jsonDecode(results[2].body) as List)
@@ -240,39 +241,49 @@ class _StudentDashboardState extends State<_StudentDashboard> {
                 children: [
                   if (_error != null) _ErrorBanner(message: _error!),
 
-                  // ── Welcome banner
+                  // ── Welcome banner ─────────────────────────────────────
                   Container(
                     padding: const EdgeInsets.all(28),
                     decoration: BoxDecoration(
-                      color: _primary, borderRadius: BorderRadius.circular(8),
+                      color: _primary,
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text('Welcome back, $_firstName!',
-                          style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800)),
                       if (_schoolName.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         Text(_schoolName,
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 15)),
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 15)),
                       ],
                     ]),
                   ),
 
                   const SizedBox(height: 20),
 
-                  // ── Stats grid
+                  // ── Stats grid ─────────────────────────────────────────
                   _StatsGrid(stats: _stats),
 
                   const SizedBox(height: 28),
 
-                  // ── Quick Access + Progress Widget side by side on wide screens
+                  // ── Quick Access + Progress ────────────────────────────
                   LayoutBuilder(builder: (context, constraints) {
                     final wide = constraints.maxWidth >= 700;
                     final quickAccess = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const _SectionHeader(icon: Icons.menu_book_rounded, label: 'Quick Access'),
+                        const _SectionHeader(
+                            icon: Icons.menu_book_rounded,
+                            label: 'Quick Access'),
                         const SizedBox(height: 14),
-                        _QuickAccessGrid(onTabSelected: widget.onTabSelected, context: context),
+                        _QuickAccessGrid(
+                            onTabSelected: widget.onTabSelected,
+                            context: context),
                       ],
                     );
                     final progressWidget = _ProgressWidget(
@@ -287,7 +298,7 @@ class _StudentDashboardState extends State<_StudentDashboard> {
                           Expanded(flex: 2, child: quickAccess),
                           const SizedBox(width: 20),
                           Expanded(flex: 1, child: Column(children: [
-                            const SizedBox(height: 38), // align with grid
+                            const SizedBox(height: 38),
                             progressWidget,
                           ])),
                         ],
@@ -296,7 +307,9 @@ class _StudentDashboardState extends State<_StudentDashboard> {
                     return Column(children: [
                       quickAccess,
                       const SizedBox(height: 28),
-                      const _SectionHeader(icon: Icons.bar_chart_rounded, label: 'My Progress'),
+                      const _SectionHeader(
+                          icon: Icons.bar_chart_rounded,
+                          label: 'My Progress'),
                       const SizedBox(height: 14),
                       progressWidget,
                     ]);
@@ -304,10 +317,14 @@ class _StudentDashboardState extends State<_StudentDashboard> {
 
                   const SizedBox(height: 28),
 
-                  // ── Recent Activity
-                  const _SectionHeader(icon: Icons.schedule_rounded, label: 'Recent Activity'),
+                  // ── Recent Activity ────────────────────────────────────
+                  const _SectionHeader(
+                      icon: Icons.schedule_rounded,
+                      label: 'Recent Activity'),
                   const SizedBox(height: 14),
                   _ActivityList(activity: _activity),
+
+                  const SizedBox(height: 20),
                 ],
               ),
       ),
@@ -325,8 +342,6 @@ class _ProgressWidget extends StatefulWidget {
 }
 
 class _ProgressWidgetState extends State<_ProgressWidget> {
-  String? _selected; // selected subject for detail sheet
-
   @override
   Widget build(BuildContext context) {
     final attempts = widget.attempts;
@@ -347,15 +362,15 @@ class _ProgressWidgetState extends State<_ProgressWidget> {
       ]));
     }
 
-    // Group by subject
     final bySubject = <String, List<_QuizAttempt>>{};
     for (final a in attempts) {
       bySubject.putIfAbsent(a.subject, () => []).add(a);
     }
     final subjects   = bySubject.keys.toList();
-    final overallAvg = (attempts.fold(0, (s, a) => s + a.percentage) / attempts.length).round();
+    final overallAvg = (attempts.fold(0, (s, a) => s + a.percentage) /
+            attempts.length)
+        .round();
 
-    // Trending subject (most improved, latest vs previous)
     String? trending;
     int     trendDiff = 0;
     for (final sub in subjects) {
@@ -381,7 +396,6 @@ class _ProgressWidgetState extends State<_ProgressWidget> {
       ]),
       const SizedBox(height: 12),
 
-      // Overall summary box
       Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(8)),
@@ -392,7 +406,8 @@ class _ProgressWidgetState extends State<_ProgressWidget> {
                 style: const TextStyle(color: _primary, fontSize: 26, fontWeight: FontWeight.w800)),
           ]),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('${attempts.length} quizzes', style: const TextStyle(color: _subtle, fontSize: 11)),
+            Text('${attempts.length} quizzes',
+                style: const TextStyle(color: _subtle, fontSize: 11)),
             if (trending != null && trendDiff > 0) ...[
               const SizedBox(height: 4),
               Text('↑ $trending', style: const TextStyle(color: _primary, fontSize: 11)),
@@ -404,10 +419,11 @@ class _ProgressWidgetState extends State<_ProgressWidget> {
       _ProgressBar(value: overallAvg),
       const SizedBox(height: 16),
 
-      // Top 5 subjects
       ...subjects.take(5).map((sub) {
         final subAttempts = bySubject[sub]!;
-        final avg   = (subAttempts.fold(0,(s,a)=>s+a.percentage) / subAttempts.length).round();
+        final avg = (subAttempts.fold(0, (s, a) => s + a.percentage) /
+                subAttempts.length)
+            .round();
         final color = _subjectColors[sub] ?? _primary;
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
@@ -415,7 +431,9 @@ class _ProgressWidgetState extends State<_ProgressWidget> {
             onTap: () => _showSubjectDetail(context, sub, bySubject[sub]!),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(sub, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13)),
+                Text(sub,
+                    style: TextStyle(
+                        color: color, fontWeight: FontWeight.w600, fontSize: 13)),
                 Text('$avg%', style: const TextStyle(color: _muted, fontSize: 12)),
               ]),
               const SizedBox(height: 4),
@@ -436,10 +454,14 @@ class _ProgressWidgetState extends State<_ProgressWidget> {
     ]));
   }
 
-  void _showSubjectDetail(BuildContext context, String subject, List<_QuizAttempt> attempts) {
+  void _showSubjectDetail(
+      BuildContext context, String subject, List<_QuizAttempt> attempts) {
     final color   = _subjectColors[subject] ?? _primary;
-    final avg     = (attempts.fold(0,(s,a)=>s+a.percentage) / attempts.length).round();
-    final best    = attempts.map((a)=>a.percentage).reduce((a,b)=>a>b?a:b);
+    final avg     = (attempts.fold(0, (s, a) => s + a.percentage) /
+            attempts.length)
+        .round();
+    final best =
+        attempts.map((a) => a.percentage).reduce((a, b) => a > b ? a : b);
     final byTopic = <String, List<_QuizAttempt>>{};
     for (final a in attempts) {
       byTopic.putIfAbsent(a.topic ?? 'Unknown', () => []).add(a);
@@ -461,39 +483,38 @@ class _ProgressWidgetState extends State<_ProgressWidget> {
           controller: scrollCtrl,
           padding: const EdgeInsets.all(20),
           children: [
-            // Handle bar
             Center(
               child: Container(
                 width: 40, height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(color: _border, borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(
+                    color: _border, borderRadius: BorderRadius.circular(2)),
               ),
             ),
-
-            // Header
             Row(children: [
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(subject,
-                    style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w800)),
+                    style: TextStyle(
+                        color: color, fontSize: 18, fontWeight: FontWeight.w800)),
                 Text('${attempts.length} attempts · Avg $avg% · Best $best%',
                     style: const TextStyle(color: _subtle, fontSize: 12)),
               ])),
             ]),
             const SizedBox(height: 16),
-
-            // Overall bar
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Overall average', style: TextStyle(color: _subtle, fontSize: 12)),
-              Text('$avg%', style: const TextStyle(color: _text, fontWeight: FontWeight.bold, fontSize: 12)),
+              const Text('Overall average',
+                  style: TextStyle(color: _subtle, fontSize: 12)),
+              Text('$avg%',
+                  style: const TextStyle(
+                      color: _text, fontWeight: FontWeight.bold, fontSize: 12)),
             ]),
             const SizedBox(height: 4),
             _ProgressBar(value: avg, color: color, height: 8),
             const SizedBox(height: 20),
-
-            // Score history bar chart
             if (attempts.length > 1) ...[
               const Text('Score History',
-                  style: TextStyle(color: _muted, fontSize: 12, fontWeight: FontWeight.w600)),
+                  style: TextStyle(
+                      color: _muted, fontSize: 12, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               SizedBox(
                 height: 64,
@@ -505,7 +526,8 @@ class _ProgressWidgetState extends State<_ProgressWidget> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 1),
                         child: Tooltip(
-                          message: '${a.percentage}%${a.topic != null ? "\n${a.topic}" : ""}',
+                          message:
+                              '${a.percentage}%${a.topic != null ? "\n${a.topic}" : ""}',
                           child: Container(
                             height: barH,
                             decoration: BoxDecoration(
@@ -521,20 +543,22 @@ class _ProgressWidgetState extends State<_ProgressWidget> {
               ),
               const SizedBox(height: 20),
             ],
-
-            // Topic breakdown
             const Text('Topic Breakdown',
-                style: TextStyle(color: _muted, fontSize: 12, fontWeight: FontWeight.w600)),
+                style: TextStyle(
+                    color: _muted, fontSize: 12, fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
             ...byTopic.entries.map((e) {
-              final tAvg = (e.value.fold(0,(s,a)=>s+a.percentage) / e.value.length).round();
+              final tAvg = (e.value.fold(0, (s, a) => s + a.percentage) /
+                      e.value.length)
+                  .round();
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
-                    Expanded(child: Text(e.key,
-                        style: const TextStyle(color: _text, fontSize: 12),
-                        overflow: TextOverflow.ellipsis)),
+                    Expanded(
+                        child: Text(e.key,
+                            style: const TextStyle(color: _text, fontSize: 12),
+                            overflow: TextOverflow.ellipsis)),
                     Text('$tAvg% · ${e.value.length}×',
                         style: const TextStyle(color: _muted, fontSize: 11)),
                   ]),
@@ -553,10 +577,11 @@ class _ProgressWidgetState extends State<_ProgressWidget> {
 // ─── Shared widgets ───────────────────────────────────────────────────────────
 
 class _ProgressBar extends StatefulWidget {
-  final int   value;
-  final Color color;
+  final int    value;
+  final Color  color;
   final double height;
-  const _ProgressBar({required this.value, this.color = _primary, this.height = 6});
+  const _ProgressBar(
+      {required this.value, this.color = _primary, this.height = 6});
   @override State<_ProgressBar> createState() => _ProgressBarState();
 }
 
@@ -568,21 +593,23 @@ class _ProgressBarState extends State<_ProgressBar> {
     Future.delayed(const Duration(milliseconds: 120),
         () { if (mounted) setState(() => _width = widget.value.toDouble()); });
   }
+
   Color get _barColor {
     if (widget.value >= 75) return widget.color;
     if (widget.value >= 50) return _yellow;
     return _red;
   }
+
   @override
   Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(4),
-    child: LinearProgressIndicator(
-      value: _width / 100,
-      backgroundColor: _border,
-      valueColor: AlwaysStoppedAnimation<Color>(_barColor),
-      minHeight: widget.height,
-    ),
-  );
+        borderRadius: BorderRadius.circular(4),
+        child: LinearProgressIndicator(
+          value: _width / 100,
+          backgroundColor: _border,
+          valueColor: AlwaysStoppedAnimation<Color>(_barColor),
+          minHeight: widget.height,
+        ),
+      );
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -591,23 +618,29 @@ class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.icon, required this.label});
   @override
   Widget build(BuildContext context) => Row(children: [
-    Icon(icon, color: _text, size: 22),
-    const SizedBox(width: 8),
-    Text(label, style: const TextStyle(color: _text, fontSize: 20, fontWeight: FontWeight.w800)),
-  ]);
+        Icon(icon, color: _text, size: 22),
+        const SizedBox(width: 8),
+        Text(label,
+            style: const TextStyle(
+                color: _text, fontSize: 20, fontWeight: FontWeight.w800)),
+      ]);
 }
 
 class _DashCard extends StatelessWidget {
-  final Widget child;
+  final Widget             child;
   final EdgeInsetsGeometry padding;
-  final VoidCallback? onTap;
-  const _DashCard({required this.child, this.padding = const EdgeInsets.all(18), this.onTap});
+  final VoidCallback?      onTap;
+  const _DashCard(
+      {required this.child,
+      this.padding = const EdgeInsets.all(18),
+      this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final card = Container(
       decoration: BoxDecoration(
-        color: _surface, border: Border.all(color: _border),
+        color: _surface,
+        border: Border.all(color: _border),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(padding: padding, child: child),
@@ -615,7 +648,8 @@ class _DashCard extends StatelessWidget {
     if (onTap == null) return card;
     return Material(
       color: Colors.transparent,
-      child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(8), child: card),
+      child: InkWell(
+          onTap: onTap, borderRadius: BorderRadius.circular(8), child: card),
     );
   }
 }
@@ -625,15 +659,16 @@ class _ErrorBanner extends StatelessWidget {
   const _ErrorBanner({required this.message});
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    decoration: BoxDecoration(
-      color: const Color(0xFF3D1F1F),
-      border: Border.all(color: const Color(0xFFF85149)),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Text(message, style: const TextStyle(color: Color(0xFFF85149), fontSize: 13)),
-  );
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF3D1F1F),
+          border: Border.all(color: const Color(0xFFF85149)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(message,
+            style: const TextStyle(color: Color(0xFFF85149), fontSize: 13)),
+      );
 }
 
 // ─── Stats grid ───────────────────────────────────────────────────────────────
@@ -656,18 +691,25 @@ class _StatsGrid extends StatelessWidget {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: cols, crossAxisSpacing: 12, mainAxisSpacing: 12,
+          crossAxisCount: cols,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
           childAspectRatio: cols == 3 ? 1.55 : 1.25,
         ),
-        itemBuilder: (context, i) => _DashCard(child: Column(
+        itemBuilder: (context, i) => _DashCard(
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment:  MainAxisAlignment.center,
           children: [
             Text(items[i].$1,
-                style: const TextStyle(color: _primary, fontSize: 26, fontWeight: FontWeight.w800)),
+                style: const TextStyle(
+                    color: _primary,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
             Text(items[i].$2,
-                maxLines: 2, overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: _subtle, fontSize: 13)),
           ],
         )),
@@ -681,16 +723,20 @@ class _StatsGrid extends StatelessWidget {
 class _QuickAccessGrid extends StatelessWidget {
   final ValueChanged<int> onTabSelected;
   final BuildContext      context;
-  const _QuickAccessGrid({required this.onTabSelected, required this.context});
+  const _QuickAccessGrid(
+      {required this.onTabSelected, required this.context});
 
   @override
   Widget build(BuildContext outerCtx) {
+    // tabIdx 3 = Quizzes tab; testsTabIdx 3 = Structured Tests inside QuizzesScreen
     final items = [
-      (Icons.local_library_rounded, 'Books Library',    'Browse textbooks and novels', 1),
-      (Icons.assignment_rounded,    'Past Papers',       'Access exam papers',          2),
-      (Icons.edit_note_rounded,     'Practice Quizzes',  'Test your knowledge',         3),
-      (Icons.school_rounded,        'Study Materials',   'Notes and worksheets',        -1),
+      (Icons.local_library_rounded, 'Books Library',   'Browse textbooks and novels',        1, false),
+      (Icons.assignment_rounded,    'Past Papers',      'Access exam papers',                 2, false),
+      (Icons.edit_note_rounded,     'Practice Quizzes', 'Test your knowledge',                3, false),
+      (Icons.fact_check_rounded,    'Structured Tests', 'Timed tests from your teacher',      3, true ),
+      // ↑ tabIdx 3 navigates to Quizzes tab, isTests=true then jumps to inner tab 3
     ];
+
     return LayoutBuilder(builder: (ctx, constraints) {
       final cols = constraints.maxWidth >= 560 ? 2 : 1;
       return GridView.builder(
@@ -698,36 +744,56 @@ class _QuickAccessGrid extends StatelessWidget {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: cols, crossAxisSpacing: 14, mainAxisSpacing: 14,
+          crossAxisCount: cols,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
           childAspectRatio: cols == 1 ? 2.8 : 1.15,
         ),
         itemBuilder: (_, i) {
-          final (icon, title, desc, tabIdx) = items[i];
+          final (icon, title, desc, tabIdx, isTests) = items[i];
           return _DashCard(
             padding: EdgeInsets.zero,
-            onTap: tabIdx >= 0
-                ? () => onTabSelected(tabIdx)
-                : () => ScaffoldMessenger.of(outerCtx).showSnackBar(
-                    const SnackBar(content: Text('Coming soon!'))),
+            onTap: () {
+              // Always go to Quizzes tab first
+              onTabSelected(tabIdx);
+              // If it's Structured Tests, jump to inner tab 3 after nav
+              if (isTests) {
+                Future.delayed(const Duration(milliseconds: 100), () {
+                  QuizzesScreen.jumpToTab(3);
+                });
+              }
+            },
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Expanded(
                 child: Container(
                   width: double.infinity,
                   alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: _bg,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+                  decoration: BoxDecoration(
+                    color: isTests
+                        ? const Color(0xFF1A3A2A) // green-tinted bg
+                        : _bg,
+                    borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(8)),
                   ),
-                  child: Icon(icon, color: _text, size: 34),
+                  child: Icon(icon,
+                      color: isTests ? _primary : _text,
+                      size: 34),
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.all(14),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: _text, fontWeight: FontWeight.w700, fontSize: 15)),
+                  Text(title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: isTests ? _primary : _text,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15)),
                   const SizedBox(height: 5),
-                  Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis,
+                  Text(desc,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: _subtle, fontSize: 13)),
                 ]),
               ),
@@ -748,7 +814,8 @@ class _ActivityList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (activity.isEmpty) {
-      return _DashCard(child: const Center(
+      return _DashCard(
+          child: const Center(
         child: Text(
           'No activity yet. Start by downloading a resource or taking a quiz!',
           textAlign: TextAlign.center,
@@ -763,7 +830,8 @@ class _ActivityList extends StatelessWidget {
           DecoratedBox(
             decoration: BoxDecoration(
               border: i != activity.length - 1
-                  ? const Border(bottom: BorderSide(color: _border)) : null,
+                  ? const Border(bottom: BorderSide(color: _border))
+                  : null,
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -771,13 +839,19 @@ class _ActivityList extends StatelessWidget {
                 Container(
                   width: 8, height: 8,
                   margin: const EdgeInsets.only(top: 6),
-                  decoration: BoxDecoration(color: activity[i].dot, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                      color: activity[i].dot, shape: BoxShape.circle),
                 ),
                 const SizedBox(width: 12),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(activity[i].text, style: const TextStyle(color: _muted, fontSize: 14)),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                  Text(activity[i].text,
+                      style: const TextStyle(color: _muted, fontSize: 14)),
                   const SizedBox(height: 4),
-                  Text(activity[i].time, style: const TextStyle(color: _subtle, fontSize: 12)),
+                  Text(activity[i].time,
+                      style: const TextStyle(color: _subtle, fontSize: 12)),
                 ])),
               ]),
             ),

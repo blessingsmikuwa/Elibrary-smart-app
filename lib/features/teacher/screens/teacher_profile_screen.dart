@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/screens/login_screen.dart';
-import 'api_service.dart'; // adjust path
+import '../../../core/services/api_service.dart'; // adjust path
 
 class TeacherProfilePage extends StatefulWidget {
   const TeacherProfilePage({super.key});
