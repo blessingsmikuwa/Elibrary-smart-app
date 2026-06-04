@@ -2,38 +2,42 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/api_service.dart'; 
+import '../../../core/services/api_service.dart';
 import './upload_material_screen.dart';
-
-const Map<String, Color> _subjectColors = {
-  'Biology':    Color(0xFF2ea043),
-  'Mathematics':Color(0xFF58a6ff),
-  'English':    Color(0xFFe3a525),
-  'Physics':    Color(0xFFa371f7),
-  'Chemistry':  Color(0xFFf85149),
-  'History':    Color(0xFF56d364),
-};
-Color _subjectColor(String? subject) =>
-    _subjectColors[subject] ?? const Color(0xFF8b949e);
 
 class TeachingMaterialsScreen extends StatefulWidget {
   const TeachingMaterialsScreen({super.key});
 
   @override
-  State<TeachingMaterialsScreen> createState() => _TeachingMaterialsScreenState();
+  State<TeachingMaterialsScreen> createState() =>
+      _TeachingMaterialsScreenState();
 }
 
 class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
-  List<Map<String, dynamic>> _books      = [];
-  bool    _loading      = true;
+  List<Map<String, dynamic>> _books = [];
+  bool    _loading       = true;
   String? _error;
-  String  _search       = '';
+  String  _search        = '';
   String  _filterForm    = 'All Forms';
   String  _filterSubject = 'All Subjects';
   Map<String, dynamic>? _deleteTarget;
-  bool _showUploadModal = false;
+  bool _showUploadModal  = false;
 
-  static const _forms = ['All Forms', 'Form 1', 'Form 2', 'Form 3', 'Form 4'];
+  static const _forms = [
+    'All Forms', 'Form 1', 'Form 2', 'Form 3', 'Form 4'
+  ];
+
+  static const Map<String, Color> _subjectColors = {
+    'Biology':     Color(0xFF2EA043),
+    'Mathematics': Color(0xFF58A6FF),
+    'English':     Color(0xFFE3A525),
+    'Physics':     Color(0xFFA371F7),
+    'Chemistry':   Color(0xFFF85149),
+    'History':     Color(0xFF56D364),
+  };
+
+  Color _subjectColor(String? subject) =>
+      _subjectColors[subject] ?? const Color(0xFF8B949E);
 
   @override
   void initState() {
@@ -45,16 +49,24 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final headers = await authHeaders();
-      final res = await http.get(Uri.parse('$kApiBase/resources'), headers: headers);
+      final res = await http.get(
+        Uri.parse('$kApiBase/resources'),
+        headers: headers,
+      );
       if (res.statusCode < 300) {
         final body = jsonDecode(res.body);
-        final List raw = body is Map ? (body['data'] as List? ?? []) : body as List;
+        final List raw = body is Map
+            ? (body['data'] as List? ?? [])
+            : body as List;
         setState(() {
           _books   = raw.cast<Map<String, dynamic>>();
           _loading = false;
         });
       } else {
-        setState(() { _error = 'Failed to load (${res.statusCode})'; _loading = false; });
+        setState(() {
+          _error   = 'Failed to load (${res.statusCode})';
+          _loading = false;
+        });
       }
     } catch (e) {
       setState(() { _error = e.toString(); _loading = false; });
@@ -88,6 +100,7 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
   }
 
   void _toast(String msg, {String type = 'info'}) {
+    if (!mounted) return;
     final colors = {
       'success': AppColors.success,
       'error':   AppColors.error,
@@ -101,77 +114,95 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
   }
 
   List<String> get _subjects => [
-    'All Subjects',
-    ...{..._books.map((b) => b['category']?['name'] as String?).whereType<String>()},
-  ];
+        'All Subjects',
+        ...{
+          ..._books
+              .map((b) => b['category']?['name'] as String?)
+              .whereType<String>()
+        },
+      ];
 
   List<Map<String, dynamic>> get _filtered => _books.where((b) {
-    final matchForm    = _filterForm    == 'All Forms'    || b['targetClass']?['name'] == _filterForm;
-    final matchSubject = _filterSubject == 'All Subjects' || b['category']?['name']    == _filterSubject;
-    final q = _search.toLowerCase();
-    final matchSearch  = q.isEmpty ||
-        (b['title']       ?? '').toLowerCase().contains(q) ||
-        (b['description'] ?? '').toLowerCase().contains(q);
-    return matchForm && matchSubject && matchSearch;
-  }).toList();
+        final matchForm = _filterForm == 'All Forms' ||
+            b['targetClass']?['name'] == _filterForm;
+        final matchSubject = _filterSubject == 'All Subjects' ||
+            b['category']?['name'] == _filterSubject;
+        final q           = _search.toLowerCase();
+        final matchSearch = q.isEmpty ||
+            (b['title']       ?? '').toLowerCase().contains(q) ||
+            (b['description'] ?? '').toLowerCase().contains(q);
+        return matchForm && matchSubject && matchSearch;
+      }).toList();
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF0d1117),
+      backgroundColor: t.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0d1117),
-        title: const Text('Resources Library',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: t.surface,
+        title: Text('Resources Library',
+            style: TextStyle(
+                color: t.text, fontWeight: FontWeight.bold)),
+        iconTheme: IconThemeData(color: t.text),
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: t.border),
+        ),
       ),
       body: Stack(
         children: [
           RefreshIndicator(
             onRefresh: _fetchBooks,
+            color: t.primary,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Header banner ────────────────────────────────
+                  // ── Header banner ───────────────────────────────────
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1a3a2a),
+                      color: t.greenBg,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF2ea043)),
+                      border: Border.all(color: t.greenBgBorder),
                     ),
                     child: Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('📚 Resources Library',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: t.text,
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                   )),
-                              SizedBox(height: 4),
+                              const SizedBox(height: 4),
                               Text(
                                 'Manage and upload books, textbooks, and study materials.',
-                                style: TextStyle(color: Color(0xCCffffff), fontSize: 12),
+                                style: TextStyle(
+                                    color: t.muted, fontSize: 12),
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
-                          onPressed: () => setState(() => _showUploadModal = true),
-                          icon: const Icon(Icons.add, size: 16, color: Colors.white),
+                          onPressed: () =>
+                              setState(() => _showUploadModal = true),
+                          icon: const Icon(Icons.add,
+                              size: 16, color: Colors.white),
                           label: const Text('Add New',
-                              style: TextStyle(color: Colors.white, fontSize: 13)),
+                              style: TextStyle(
+                                  color: Colors.white, fontSize: 13)),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2ea043),
+                            backgroundColor: t.primary,
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8)),
                             padding: const EdgeInsets.symmetric(
@@ -184,22 +215,25 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ── Stats row ─────────────────────────────────────
+                  // ── Stats row ───────────────────────────────────────
                   if (!_loading && _error == null) ...[
                     Row(children: [
-                      _statCard('${_books.length}',          'Total Resources'),
+                      _statCard(t, '${_books.length}', 'Total Resources'),
                       const SizedBox(width: 10),
                       _statCard(
+                        t,
                         '${_books.map((b) => b['category']?['name']).whereType<String>().toSet().length}',
                         'Subjects',
                       ),
                       const SizedBox(width: 10),
                       _statCard(
+                        t,
                         '${_books.fold<int>(0, (s, b) => s + ((b['downloadCount'] as int?) ?? 0))}',
                         'Downloads',
                       ),
                       const SizedBox(width: 10),
                       _statCard(
+                        t,
                         '${_books.map((b) => b['targetClass']?['name']).whereType<String>().toSet().length}',
                         'Forms',
                       ),
@@ -207,41 +241,41 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
                     const SizedBox(height: 16),
                   ],
 
-                  // ── Search ────────────────────────────────────────
+                  // ── Search ──────────────────────────────────────────
                   TextField(
                     onChanged: (v) => setState(() => _search = v),
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: t.text),
                     decoration: InputDecoration(
                       hintText: '🔍  Search resources...',
-                      hintStyle: const TextStyle(color: Color(0xFF6e7681)),
+                      hintStyle: TextStyle(color: t.subtle),
                       filled: true,
-                      fillColor: const Color(0xFF161b22),
+                      fillColor: t.inputBg,
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF21262d)),
+                        borderSide: BorderSide(color: t.textFieldBorder),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF21262d)),
+                        borderSide: BorderSide(color: t.textFieldBorder),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF2ea043)),
+                        borderSide: BorderSide(color: t.primary),
                       ),
                     ),
                   ),
                   const SizedBox(height: 10),
 
-                  // ── Form filter ───────────────────────────────────
+                  // ── Form filter ─────────────────────────────────────
                   SizedBox(
                     height: 38,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: _forms
                           .map((f) => _filterChip(
-                                f,
+                                t, f,
                                 _filterForm == f,
                                 () => setState(() => _filterForm = f),
                               ))
@@ -250,14 +284,14 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // ── Subject filter ────────────────────────────────
+                  // ── Subject filter ──────────────────────────────────
                   SizedBox(
                     height: 38,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: _subjects
                           .map((s) => _filterChip(
-                                s,
+                                t, s,
                                 _filterSubject == s,
                                 () => setState(() => _filterSubject = s),
                               ))
@@ -268,55 +302,63 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
 
                   Text(
                     '${_filtered.length} resource${_filtered.length != 1 ? 's' : ''} found',
-                    style: const TextStyle(color: Color(0xFF6e7681), fontSize: 13),
+                    style: TextStyle(color: t.subtle, fontSize: 13),
                   ),
                   const SizedBox(height: 12),
 
-                  // ── Body ──────────────────────────────────────────
+                  // ── Body ────────────────────────────────────────────
                   if (_loading)
-                    const Center(
+                    Center(
                       child: Padding(
-                        padding: EdgeInsets.all(40),
-                        child: CircularProgressIndicator(color: Color(0xFF2ea043)),
+                        padding: const EdgeInsets.all(40),
+                        child: CircularProgressIndicator(color: t.primary),
                       ),
                     )
                   else if (_error != null)
                     Center(
                       child: Column(children: [
-                        Text(_error!, style: const TextStyle(color: Color(0xFFf85149))),
+                        Text(_error!,
+                            style: TextStyle(color: t.danger)),
                         const SizedBox(height: 12),
-                        ElevatedButton(onPressed: _fetchBooks, child: const Text('Retry')),
+                        ElevatedButton(
+                            onPressed: _fetchBooks,
+                            child: const Text('Retry')),
                       ]),
                     )
                   else if (_filtered.isEmpty)
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 60),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 60),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF161b22),
+                        color: t.cardBg,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF21262d)),
+                        border: Border.all(color: t.cardBorder),
                       ),
-                      child: const Column(children: [
-                        Text('📭', style: TextStyle(fontSize: 36)),
-                        SizedBox(height: 8),
+                      child: Column(children: [
+                        const Text('📭',
+                            style: TextStyle(fontSize: 36)),
+                        const SizedBox(height: 8),
                         Text('No resources match your filters.',
-                            style: TextStyle(color: Color(0xFF6e7681), fontSize: 13)),
+                            style: TextStyle(
+                                color: t.subtle,
+                                fontSize: 13)),
                       ]),
                     )
                   else
-                    // Grid of cards — 2 columns like web
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
                         childAspectRatio: 0.72,
                       ),
                       itemCount: _filtered.length,
-                      itemBuilder: (_, i) => _resourceCard(_filtered[i]),
+                      itemBuilder: (_, i) =>
+                          _resourceCard(t, _filtered[i]),
                     ),
 
                   const SizedBox(height: 32),
@@ -325,13 +367,14 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
             ),
           ),
 
-          // ── Delete confirm modal ───────────────────────────────────
-          if (_deleteTarget != null) _deleteModal(),
+          // ── Delete confirm modal ─────────────────────────────────────
+          if (_deleteTarget != null) _deleteModal(t),
 
-          // ── Upload modal ──────────────────────────────────────────
+          // ── Upload modal ─────────────────────────────────────────────
           if (_showUploadModal)
             UploadModal(
-              onClose: () => setState(() => _showUploadModal = false),
+              onClose: () =>
+                  setState(() => _showUploadModal = false),
               onUploaded: () {
                 setState(() => _showUploadModal = false);
                 _fetchBooks();
@@ -343,71 +386,73 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
     );
   }
 
-  Widget _statCard(String number, String label) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161b22),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF21262d)),
-      ),
-      child: Column(
-        children: [
-          Text(number,
-              style: const TextStyle(
-                color: Color(0xFF2ea043),
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              )),
-          const SizedBox(height: 2),
-          Text(label,
-              style: const TextStyle(color: Color(0xFF6e7681), fontSize: 10),
-              textAlign: TextAlign.center),
-        ],
-      ),
-    ),
-  );
+  Widget _statCard(AppThemeData t, String number, String label) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+          decoration: BoxDecoration(
+            color: t.statBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: t.cardBorder),
+          ),
+          child: Column(
+            children: [
+              Text(number,
+                  style: TextStyle(
+                    color: t.primary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  )),
+              const SizedBox(height: 2),
+              Text(label,
+                  style: TextStyle(color: t.subtle, fontSize: 10),
+                  textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      );
 
-  Widget _filterChip(String label, bool active, VoidCallback onTap) =>
+  Widget _filterChip(
+          AppThemeData t, String label, bool active, VoidCallback onTap) =>
       GestureDetector(
         onTap: onTap,
         child: Container(
           margin: const EdgeInsets.only(right: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
-            color: active ? const Color(0xFF2ea043) : const Color(0xFF161b22),
+            color: active ? t.primary : t.chipInactiveBg,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: active ? const Color(0xFF2ea043) : const Color(0xFF21262d),
+              color: active ? t.primary : t.chipInactiveBorder,
             ),
           ),
           child: Text(label,
               style: TextStyle(
-                color: active ? Colors.white : const Color(0xFF6e7681),
+                color: active ? Colors.white : t.chipInactiveText,
                 fontSize: 12,
-                fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+                fontWeight:
+                    active ? FontWeight.w600 : FontWeight.normal,
               )),
         ),
       );
 
-  Widget _resourceCard(Map<String, dynamic> book) {
-    final subject = book['category']?['name'] as String? ?? 'Other';
-    final form    = book['targetClass']?['name'] as String? ?? '—';
-    final color   = _subjectColor(subject);
-    final isPublished  = book['status']     == 'PUBLISHED';
-    final isPublic     = book['visibility'] == 'PUBLIC';
+  Widget _resourceCard(AppThemeData t, Map<String, dynamic> book) {
+    final subject     = book['category']?['name'] as String? ?? 'Other';
+    final form        = book['targetClass']?['name'] as String? ?? '—';
+    final color       = _subjectColor(subject);
+    final isPublished = book['status']     == 'PUBLISHED';
+    final isPublic    = book['visibility'] == 'PUBLIC';
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF161b22),
+        color: t.cardBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF21262d)),
+        border: Border.all(color: t.cardBorder),
       ),
       clipBehavior: Clip.hardEdge,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Color bar (top accent like web)
           Container(height: 4, color: color),
           Expanded(
             child: Padding(
@@ -416,7 +461,8 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment:
+                        MainAxisAlignment.spaceBetween,
                     children: [
                       Flexible(
                         child: Container(
@@ -435,14 +481,15 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
                         ),
                       ),
                       Text(form,
-                          style: const TextStyle(
-                              color: Color(0xFF6e7681), fontSize: 10)),
+                          style: TextStyle(
+                              color: t.subtle,
+                              fontSize: 10)),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(book['title'] ?? 'Untitled',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: t.text,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
                         height: 1.3,
@@ -450,67 +497,55 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis),
                   if (book['description'] != null &&
-                      (book['description'] as String).isNotEmpty) ...[
+                      (book['description'] as String)
+                          .isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(book['description'],
-                        style: const TextStyle(
-                            color: Color(0xFF6e7681), fontSize: 11),
+                        style: TextStyle(
+                            color: t.subtle, fontSize: 11),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis),
                   ],
                   const Spacer(),
-                  // Meta chips
                   Wrap(
                     spacing: 4,
                     runSpacing: 4,
                     children: [
-                      _metaBadge('📄 ${book['type'] ?? ''}'),
-                      _metaBadge('⬇️ ${book['downloadCount'] ?? 0}'),
+                      _metaBadge(t, '📄 ${book['type'] ?? ''}'),
+                      _metaBadge(
+                          t, '⬇️ ${book['downloadCount'] ?? 0}'),
                       _statusBadge(
                         isPublished ? 'Published' : 'Draft',
-                        isPublished
-                            ? const Color(0xFF2ea043)
-                            : const Color(0xFF8b949e),
-                        isPublished
-                            ? const Color(0xFF1a3a22)
-                            : const Color(0xFF21262d),
+                        isPublished ? t.greenAccent : t.muted,
+                        isPublished ? t.greenBg    : t.surface2,
                       ),
                       _statusBadge(
                         isPublic ? 'Public' : 'Private',
-                        isPublic
-                            ? const Color(0xFF388bfd)
-                            : const Color(0xFFf0883e),
-                        isPublic
-                            ? const Color(0xFF1a2a3d)
-                            : const Color(0xFF2d1f0e),
+                        isPublic ? t.blueText : t.amberText,
+                        isPublic ? t.blueBg   : t.amberBg,
                       ),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  // Action buttons
                   Row(children: [
                     Expanded(
                       child: _cardButton(
                         label: '👁 View',
-                        bg: const Color(0xFF21262d),
-                        border: const Color(0xFF30363d),
-                        textColor: Colors.white,
-                        onTap: () {
-                          final url = book['fileUrl'] as String?;
-                          if (url != null && url.isNotEmpty) {
-                            // launch URL via url_launcher if available
-                          }
-                        },
+                        bg: t.surface2,
+                        border: t.border,
+                        textColor: t.text,
+                        onTap: () {},
                       ),
                     ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: _cardButton(
                         label: '🗑 Remove',
-                        bg: const Color(0xFF3d1a1a),
-                        border: const Color(0xFFf85149),
-                        textColor: const Color(0xFFf85149),
-                        onTap: () => setState(() => _deleteTarget = book),
+                        bg: t.redBg,
+                        border: t.redText,
+                        textColor: t.redText,
+                        onTap: () =>
+                            setState(() => _deleteTarget = book),
                       ),
                     ),
                   ]),
@@ -523,15 +558,17 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
     );
   }
 
-  Widget _metaBadge(String text) => Text(text,
-      style: const TextStyle(color: Color(0xFF6e7681), fontSize: 10));
+  Widget _metaBadge(AppThemeData t, String text) => Text(text,
+      style: TextStyle(color: t.subtle, fontSize: 10));
 
-  Widget _statusBadge(String text, Color textColor, Color bg) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-    decoration: BoxDecoration(
-        color: bg, borderRadius: BorderRadius.circular(4)),
-    child: Text(text, style: TextStyle(color: textColor, fontSize: 9)),
-  );
+  Widget _statusBadge(String text, Color textColor, Color bg) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        decoration: BoxDecoration(
+            color: bg, borderRadius: BorderRadius.circular(4)),
+        child: Text(text,
+            style: TextStyle(color: textColor, fontSize: 9)),
+      );
 
   Widget _cardButton({
     required String label,
@@ -558,42 +595,43 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
         ),
       );
 
-  Widget _deleteModal() {
+  Widget _deleteModal(AppThemeData t) {
     return Container(
-      color: Colors.black.withValues(alpha: 0.7),
+      color: Colors.black.withValues(alpha: 0.6),
       child: Center(
         child: Container(
           margin: const EdgeInsets.all(24),
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: const Color(0xFF161b22),
+            color: t.surface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFf85149)),
+            border: Border.all(color: t.danger),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text('🗑️', style: TextStyle(fontSize: 32)),
               const SizedBox(height: 10),
-              const Text('Request Resource Deletion?',
+              Text('Request Resource Deletion?',
                   style: TextStyle(
-                      color: Colors.white,
+                      color: t.text,
                       fontSize: 16,
                       fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
               Text(
                 'Are you sure you want to request deletion of "${_deleteTarget!['title']}"? This cannot be undone.',
-                style: const TextStyle(color: Color(0xFF8b949e), fontSize: 13),
+                style: TextStyle(color: t.muted, fontSize: 13),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
               Row(children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => setState(() => _deleteTarget = null),
+                    onPressed: () =>
+                        setState(() => _deleteTarget = null),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF30363d)),
-                      foregroundColor: Colors.white,
+                      side: BorderSide(color: t.border),
+                      foregroundColor: t.text,
                     ),
                     child: const Text('Cancel'),
                   ),
@@ -603,7 +641,7 @@ class _TeachingMaterialsScreenState extends State<TeachingMaterialsScreen> {
                   child: ElevatedButton(
                     onPressed: _sendDeleteRequest,
                     style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFf85149)),
+                        backgroundColor: t.danger),
                     child: const Text('Send Request',
                         style: TextStyle(color: Colors.white)),
                   ),

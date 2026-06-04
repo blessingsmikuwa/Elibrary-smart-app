@@ -1,160 +1,219 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class AppColors {
-  static const Color background = Color(0xFF0D1117);
-  static const Color surface = Color(0xFF161B22);
-  static const Color surface2 = Color(0xFF0D1117);
-  static const Color primary = Color(0xFF2EA043);
-  static const Color primaryDark = Color(0xFF238636);
-  static const Color text = Color(0xFFE6EDF3);
-  static const Color text2 = Color(0xFF8B949E);
-  static const Color muted = Color(0xFF6E7681);
-  static const Color border = Color(0xFF21262D);
-  static const Color accent4 = Color(0xFFF85149);
-  static const Color errorSurface = Color(0xFF3D1F1F);
-  static const Color success = Color(0xFF2EA043);
-  static const Color warning = Color(0xFFD29922);
-  static const Color error = Color(0xFFF85149);
+class AppThemeData {
+  final bool isDark;
+  const AppThemeData({required this.isDark});
+
+  static const _darkBg      = Color(0xFF111827);
+  static const _darkSurface = Color(0xFF1F2937);
+  static const _darkBorder  = Color(0xFF374151);
+  static const _darkText    = Color(0xFFE5E7EB);
+  static const _darkMuted   = Color(0xFF9CA3AF);
+  static const _darkSubtle  = Color(0xFF6B7280);
+
+  static const _lightBg      = Color(0xFFF9FAFB);
+  static const _lightSurface = Color(0xFFFFFFFF);
+  static const _lightBorder  = Color(0xFFE5E7EB);
+  static const _lightText    = Color(0xFF111827);
+  static const _lightMuted   = Color(0xFF6B7280);
+  static const _lightSubtle  = Color(0xFF9CA3AF);
+
+  static const _primary = Color(0xFF10B981);
+  static const _teal    = Color(0xFF0D9488);
+  static const _amber   = Color(0xFFF59E0B);
+  static const _danger  = Color(0xFFEF4444);
+
+  Color get bg      => isDark ? _darkBg      : _lightBg;
+  Color get surface => isDark ? _darkSurface : _lightSurface;
+  Color get border  => isDark ? _darkBorder  : _lightBorder;
+  Color get text    => isDark ? _darkText    : _lightText;
+  Color get muted   => isDark ? _darkMuted   : _lightMuted;
+  Color get subtle  => isDark ? _darkSubtle  : _lightSubtle;
+  Color get primary => _primary;
+  Color get teal    => _teal;
+  Color get amber   => _amber;
+  Color get danger  => _danger;
+
+  Color get background => bg;
+  Color get surface2   => isDark ? const Color(0xFF374151) : const Color(0xFFF3F4F6);
+
+  Color get heroBg => isDark
+      ? const Color(0xFF064E3B).withValues(alpha: 0.35)
+      : const Color(0xFFECFDF5);
+  Color get heroBorder => isDark
+      ? _primary.withValues(alpha: 0.3)
+      : const Color(0xFF6EE7B7);
+
+  Color get inputFill   => isDark ? const Color(0xFF111827) : Colors.white;
+  Color get inputBorder => isDark ? _darkBorder : const Color(0xFFD1D5DB);
+
+  Color get dropdownFill => isDark ? _darkSurface : Colors.white;
+
+  Color get errorBg => isDark
+      ? const Color(0xFF7F1D1D).withValues(alpha: 0.4)
+      : const Color(0xFFFEF2F2);
+  Color get errorBorder => isDark
+      ? _danger.withValues(alpha: 0.5)
+      : const Color(0xFFFCA5A5);
+
+  Color get cardHoverBorder => isDark
+      ? const Color(0xFF4B5563)
+      : const Color(0xFF6EE7B7);
+
+  // Accent shades used across screens
+  Color get greenAccent  => isDark ? const Color(0xFF2EA043) : const Color(0xFF059669);
+  Color get greenBg      => isDark
+      ? const Color(0xFF1A3A2A)
+      : const Color(0xFFECFDF5);
+  Color get greenBgBorder => isDark
+      ? const Color(0xFF2EA043)
+      : const Color(0xFF6EE7B7);
+
+  Color get blueBg  => isDark ? const Color(0xFF0D2A3D) : const Color(0xFFEFF6FF);
+  Color get blueText => isDark ? const Color(0xFF58A6FF) : const Color(0xFF2563EB);
+
+  Color get redBg   => isDark ? const Color(0xFF3D1A1A) : const Color(0xFFFEF2F2);
+  Color get redText => isDark ? const Color(0xFFF85149) : const Color(0xFFDC2626);
+
+  Color get amberBg   => isDark ? const Color(0xFF3A2A1A) : const Color(0xFFFFFBEB);
+  Color get amberText => isDark ? const Color(0xFFE3B341) : const Color(0xFFD97706);
+
+  Color get chipActiveBg   => greenAccent;
+  Color get chipInactiveBg => isDark ? const Color(0xFF161B22) : const Color(0xFFF3F4F6);
+  Color get chipInactiveBorder => isDark ? const Color(0xFF21262D) : const Color(0xFFD1D5DB);
+  Color get chipInactiveText   => isDark ? const Color(0xFF6E7681) : const Color(0xFF6B7280);
+
+  Color get cardBg     => isDark ? const Color(0xFF161B22) : Colors.white;
+  Color get cardBorder => isDark ? const Color(0xFF21262D) : const Color(0xFFE5E7EB);
+
+  Color get statBg => isDark ? const Color(0xFF161B22) : const Color(0xFFF9FAFB);
+
+  Color get inputBg => isDark ? const Color(0xFF161B22) : Colors.white;
+
+  Color get textFieldBorder => isDark ? const Color(0xFF21262D) : const Color(0xFFD1D5DB);
+}
+
+class AppThemeController extends StatefulWidget {
+  final Widget child;
+  final bool?  forceDark; // driven by ThemeManager when provided
+  const AppThemeController({super.key, required this.child, this.forceDark});
+
+  static _AppThemeControllerState of(BuildContext context) =>
+      context.findAncestorStateOfType<_AppThemeControllerState>()!;
+
+  @override
+  State<AppThemeController> createState() => _AppThemeControllerState();
+}
+
+class _AppThemeControllerState extends State<AppThemeController> {
+  bool _isDark = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.forceDark != null) {
+      _isDark = widget.forceDark!;
+    } else {
+      _load();
+    }
+  }
+
+  @override
+  void didUpdateWidget(AppThemeController old) {
+    super.didUpdateWidget(old);
+    if (widget.forceDark != null && widget.forceDark != _isDark) {
+      setState(() => _isDark = widget.forceDark!);
+    }
+  }
+
+  Future<void> _load() async {
+    final prefs  = await SharedPreferences.getInstance();
+    final stored = prefs.getBool('app_dark_mode');
+    if (mounted) setState(() => _isDark = stored ?? true);
+  }
+
+  Future<void> setDark(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('app_dark_mode', value);
+    if (mounted) setState(() => _isDark = value);
+  }
+
+  bool get isDark => _isDark;
+
+  @override
+  Widget build(BuildContext context) => _AppThemeInherited(
+        isDark: _isDark,
+        child: widget.child,
+      );
+}
+
+class _AppThemeInherited extends InheritedWidget {
+  final bool isDark;
+  const _AppThemeInherited({required this.isDark, required super.child});
+
+  @override
+  bool updateShouldNotify(_AppThemeInherited old) => old.isDark != isDark;
 }
 
 class AppTheme {
-  static ThemeData get darkTheme {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.primary,
-      brightness: Brightness.dark,
-      primary: AppColors.primary,
-      surface: AppColors.surface,
-    );
-
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: AppColors.background,
-      colorScheme: colorScheme,
-      primaryColor: AppColors.primary,
-      cardColor: AppColors.surface,
-      dividerColor: AppColors.border,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.text,
-        elevation: 0,
-      ),
-      drawerTheme: const DrawerThemeData(
-        backgroundColor: AppColors.surface,
-        scrimColor: Colors.black54,
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.surface,
-        indicatorColor: AppColors.primary.withValues(alpha: 0.22),
-        labelTextStyle: WidgetStateProperty.resolveWith(
-          (states) => TextStyle(
-            color: states.contains(WidgetState.selected)
-                ? AppColors.primary
-                : AppColors.text2,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        iconTheme: WidgetStateProperty.resolveWith(
-          (states) => IconThemeData(
-            color: states.contains(WidgetState.selected)
-                ? AppColors.primary
-                : AppColors.text2,
-          ),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.surface2,
-        labelStyle: const TextStyle(color: AppColors.text2),
-        hintStyle: const TextStyle(color: AppColors.text2),
-        prefixIconColor: AppColors.text2,
-        suffixIconColor: AppColors.text2,
-        errorStyle: const TextStyle(color: AppColors.accent4),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 13,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.accent4),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.accent4, width: 1.5),
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          textStyle: const TextStyle(fontWeight: FontWeight.bold),
-          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.45),
-          disabledForegroundColor: Colors.white70,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-      ),
-      chipTheme: ChipThemeData(
-        backgroundColor: AppColors.surface2,
-        selectedColor: AppColors.primaryDark,
-        labelStyle: const TextStyle(color: AppColors.text),
-        secondaryLabelStyle: const TextStyle(color: AppColors.text),
-        side: const BorderSide(color: AppColors.border),
-      ),
-      cardTheme: CardThemeData(
-        color: AppColors.surface,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: const BorderSide(color: AppColors.border),
-        ),
-      ),
-      snackBarTheme: const SnackBarThemeData(
-        backgroundColor: AppColors.surface,
-        contentTextStyle: TextStyle(color: AppColors.text),
-      ),
-      dialogTheme: DialogThemeData(
-        backgroundColor: AppColors.surface,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      datePickerTheme: const DatePickerThemeData(
-        backgroundColor: AppColors.surface,
-        surfaceTintColor: Colors.transparent,
-        headerBackgroundColor: AppColors.surface2,
-        headerForegroundColor: AppColors.text,
-      ),
-      dropdownMenuTheme: const DropdownMenuThemeData(
-        textStyle: TextStyle(color: AppColors.text),
-      ),
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(color: AppColors.text),
-        headlineMedium: TextStyle(color: AppColors.text),
-        headlineSmall: TextStyle(color: AppColors.text),
-        titleLarge: TextStyle(color: AppColors.text),
-        titleMedium: TextStyle(color: AppColors.text),
-        titleSmall: TextStyle(color: AppColors.text),
-        bodyLarge: TextStyle(color: AppColors.text),
-        bodyMedium: TextStyle(color: AppColors.text),
-        bodySmall: TextStyle(color: AppColors.text2),
-        labelLarge: TextStyle(color: AppColors.text),
-        labelMedium: TextStyle(color: AppColors.text2),
-        labelSmall: TextStyle(color: AppColors.text2),
-      ),
-    );
+  static AppThemeData of(BuildContext context) {
+    final w = context.dependOnInheritedWidgetOfExactType<_AppThemeInherited>();
+    return AppThemeData(isDark: w?.isDark ?? true);
   }
+
+  static bool isDark(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_AppThemeInherited>()?.isDark ??
+      true;
+
+  static ThemeData get light => ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: const Color(0xFFF9FAFB),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF10B981),
+          brightness: Brightness.light,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFF9FAFB),
+          foregroundColor: Color(0xFF111827),
+          elevation: 0,
+        ),
+      );
+
+  static ThemeData get dark => ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF111827),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF10B981),
+          brightness: Brightness.dark,
+          surface: const Color(0xFF1F2937),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF111827),
+          foregroundColor: Color(0xFFE5E7EB),
+          elevation: 0,
+        ),
+        dividerColor: const Color(0xFF374151),
+      );
+}
+
+class AppColors {
+  AppColors._();
+  static const primary    = Color(0xFF10B981);
+  static const success    = Color(0xFF10B981);
+  static const teal       = Color(0xFF0D9488);
+  static const amber      = Color(0xFFF59E0B);
+  static const danger     = Color(0xFFEF4444);
+  static const error      = Color(0xFFEF4444);
+  static const background = Color(0xFF111827);
+  static const surface    = Color(0xFF1F2937);
+  static const surface2   = Color(0xFF374151);
+  static const border     = Color(0xFF374151);
+  static const text       = Color(0xFFE5E7EB);
+  static const text2      = Color(0xFF9CA3AF);
+  static const muted      = Color(0xFF9CA3AF);
+  static const subtle     = Color(0xFF6B7280);
+  static const accent4    = Color(0xFFEF4444);
 }

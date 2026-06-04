@@ -10,22 +10,6 @@ import 'create_quiz_screen.dart';
 import 'student_progress_screen.dart';
 import 'teacher_profile_screen.dart';
 import 'structured_tests_teacher_screen.dart';
-import '../../../core/services/api_service.dart';
-
-
-// ─── Colours ──────────────────────────────────────────────────────────────────
-
-const _bg      = Color(0xFF0D1117);
-const _surface = Color(0xFF161B22);
-const _border  = Color(0xFF21262D);
-const _primary = Color(0xFF2EA043);
-const _green   = Color(0xFF2EA043);
-const _text    = Color(0xFFE6EDF3);
-const _muted   = Color(0xFF8B949E);
-const _subtle  = Color(0xFF6E7681);
-const _red     = Color(0xFFDA3633);
-const _yellow  = Color(0xFFE3A525);
-const _blue    = Color(0xFF58A6FF);
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 
@@ -116,33 +100,36 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     return Scaffold(
+      backgroundColor: t.bg,
       appBar: AppBar(
         title: Text(_titles[_currentIndex]),
-        backgroundColor: _surface,
-        foregroundColor: _text,
+        backgroundColor: t.surface,
+        foregroundColor: t.text,
+        elevation: 0,
       ),
       body: _screen(),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: _border)),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: t.border)),
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap:        _goTo,
-          backgroundColor:    _surface,
-          selectedItemColor:   _primary,
-          unselectedItemColor: _muted,
+          backgroundColor:    t.surface,
+          selectedItemColor:   t.primary,
+          unselectedItemColor: t.muted,
           type:            BottomNavigationBarType.fixed,
           selectedFontSize:   12,
           unselectedFontSize: 12,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.dashboard),    activeIcon: Icon(Icons.dashboard,    color: _primary), label: 'Dashboard'),
-            BottomNavigationBarItem(icon: Icon(Icons.book),         activeIcon: Icon(Icons.book,         color: _primary), label: 'Materials'),
-            BottomNavigationBarItem(icon: Icon(Icons.quiz),         activeIcon: Icon(Icons.quiz,         color: _primary), label: 'Create Quiz'),
-            BottomNavigationBarItem(icon: Icon(Icons.bar_chart),    activeIcon: Icon(Icons.bar_chart,    color: _primary), label: 'Progress'),
-            BottomNavigationBarItem(icon: Icon(Icons.edit_note),    activeIcon: Icon(Icons.edit_note,    color: _primary), label: 'Tests'),
-            BottomNavigationBarItem(icon: Icon(Icons.person),       activeIcon: Icon(Icons.person,       color: _primary), label: 'Profile'),
+          items: [
+            BottomNavigationBarItem(icon: Icon(Icons.dashboard),    label: 'Dashboard'),
+            BottomNavigationBarItem(icon: Icon(Icons.book),         label: 'Materials'),
+            BottomNavigationBarItem(icon: Icon(Icons.quiz),         label: 'Create Quiz'),
+            BottomNavigationBarItem(icon: Icon(Icons.bar_chart),    label: 'Progress'),
+            BottomNavigationBarItem(icon: Icon(Icons.edit_note),    label: 'Tests'),
+            BottomNavigationBarItem(icon: Icon(Icons.person),       label: 'Profile'),
           ],
         ),
       ),
@@ -223,18 +210,16 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   String get _displayName => '$_firstName $_lastName'.trim();
 
-  // ─── Toast helper ────────────────────────────────────────────────────────────
-
   void _toast(BuildContext context, String msg, {bool error = false}) {
+    final t = AppTheme.of(context);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
-      backgroundColor: error ? _red : _green,
+      backgroundColor: error ? t.danger : t.primary,
     ));
   }
 
-  // ─── Add Student dialog ──────────────────────────────────────────────────────
-
   void _showAddStudentDialog(BuildContext context) {
+    final t = AppTheme.of(context);
     final firstCtrl = TextEditingController();
     final lastCtrl  = TextEditingController();
     final emailCtrl = TextEditingController();
@@ -246,33 +231,32 @@ class _DashboardContentState extends State<_DashboardContent> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => Dialog(
-          backgroundColor: _surface,
+          backgroundColor: t.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
-            side: const BorderSide(color: _border),
+            side: BorderSide(color: t.border),
           ),
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                const Text('👤 Add Student', style: TextStyle(color: _text,
+                Text('👤 Add Student', style: TextStyle(color: t.text,
                     fontSize: 16, fontWeight: FontWeight.w700)),
                 const Spacer(),
-                IconButton(icon: const Icon(Icons.close, color: _muted),
+                IconButton(icon: Icon(Icons.close, color: t.muted),
                   onPressed: () => Navigator.pop(ctx)),
               ]),
-              const Divider(color: _border),
+              Divider(color: t.border),
               const SizedBox(height: 4),
-              _dialogField('First Name', firstCtrl),
+              _dialogField(t, 'First Name', firstCtrl),
               const SizedBox(height: 10),
-              _dialogField('Last Name', lastCtrl),
+              _dialogField(t, 'Last Name', lastCtrl),
               const SizedBox(height: 10),
-              _dialogField('Email', emailCtrl, keyboard: TextInputType.emailAddress),
+              _dialogField(t, 'Email', emailCtrl, keyboard: TextInputType.emailAddress),
               const SizedBox(height: 10),
-              _dialogField('Password', passCtrl, obscure: true),
+              _dialogField(t, 'Password', passCtrl, obscure: true),
               const SizedBox(height: 10),
-              // Date of birth picker
-              const Text('Date of Birth', style: TextStyle(color: _subtle, fontSize: 11)),
+              Text('Date of Birth', style: TextStyle(color: t.subtle, fontSize: 11)),
               const SizedBox(height: 4),
               GestureDetector(
                 onTap: () async {
@@ -283,7 +267,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                     lastDate: DateTime.now(),
                     builder: (c, child) => Theme(
                       data: ThemeData.dark().copyWith(
-                        colorScheme: const ColorScheme.dark(primary: _green),
+                        colorScheme: ColorScheme.dark(primary: t.primary),
                       ),
                       child: child!,
                     ),
@@ -292,17 +276,19 @@ class _DashboardContentState extends State<_DashboardContent> {
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  decoration: BoxDecoration(color: _bg,
+                  decoration: BoxDecoration(
+                    color: t.bg,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: _border)),
+                    border: Border.all(color: t.border),
+                  ),
                   child: Row(children: [
-                    const Icon(Icons.calendar_today, color: _muted, size: 16),
+                    Icon(Icons.calendar_today, color: t.muted, size: 16),
                     const SizedBox(width: 8),
                     Text(
                       dob != null
                           ? '${dob!.year}-${dob!.month.toString().padLeft(2,'0')}-${dob!.day.toString().padLeft(2,'0')}'
                           : 'Select date',
-                      style: const TextStyle(color: _text, fontSize: 13),
+                      style: TextStyle(color: t.text, fontSize: 13),
                     ),
                   ]),
                 ),
@@ -345,10 +331,12 @@ class _DashboardContentState extends State<_DashboardContent> {
                     setS(() => saving = false);
                   }
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: _green,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: t.primary,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(46),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
                 child: Text(saving ? 'Adding…' : 'Add Student',
                     style: const TextStyle(fontWeight: FontWeight.w700)),
               )),
@@ -359,43 +347,41 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
-  // ─── Dialog field helper ─────────────────────────────────────────────────────
-
-  Widget _dialogField(String label, TextEditingController ctrl,
+  Widget _dialogField(AppThemeData t, String label, TextEditingController ctrl,
       {TextInputType keyboard = TextInputType.text, bool obscure = false}) =>
     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(color: _subtle, fontSize: 11)),
+      Text(label, style: TextStyle(color: t.subtle, fontSize: 11)),
       const SizedBox(height: 4),
       TextField(
         controller: ctrl,
         obscureText: obscure,
         keyboardType: keyboard,
-        style: const TextStyle(color: _text, fontSize: 13),
+        style: TextStyle(color: t.text, fontSize: 13),
         decoration: InputDecoration(
           hintText: label,
-          hintStyle: const TextStyle(color: _subtle),
-          filled: true, fillColor: _bg,
+          hintStyle: TextStyle(color: t.subtle),
+          filled: true, fillColor: t.bg,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _border)),
+              borderSide: BorderSide(color: t.border)),
           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _border)),
+              borderSide: BorderSide(color: t.border)),
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: _green, width: 1.5)),
+              borderSide: BorderSide(color: t.primary, width: 1.5)),
         ),
       ),
     ]);
 
-  // ─── Build ───────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
+
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: _primary));
+      return Center(child: CircularProgressIndicator(color: t.primary));
     }
 
     return RefreshIndicator(
-      color: _primary,
+      color: t.primary,
       onRefresh: _fetchAll,
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -406,40 +392,43 @@ class _DashboardContentState extends State<_DashboardContent> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF1A3A2A),
+              gradient: LinearGradient(colors: [
+                t.primary.withValues(alpha: 0.25),
+                t.teal.withValues(alpha: 0.25),
+              ]),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _primary),
+              border: Border.all(color: t.primary.withValues(alpha: 0.5)),
             ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Welcome back,',
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+                  Text('Welcome back,',
+                      style: TextStyle(color: t.text, fontSize: 18, fontWeight: FontWeight.w700)),
                   Text(_displayName.isEmpty ? 'Teacher' : _displayName,
-                      style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
+                      style: TextStyle(color: t.text, fontSize: 26, fontWeight: FontWeight.w800)),
                   if (_schoolName.isNotEmpty)
                     Text('📍 $_schoolName',
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+                        style: TextStyle(color: t.muted, fontSize: 13)),
                 ])),
               ]),
               const SizedBox(height: 16),
               Wrap(spacing: 10, runSpacing: 10, children: [
                 _BannerBtn(
                   label: '✏️ Create Quiz',
-                  bg: _yellow, fg: Colors.black,
+                  bg: t.amber, fg: Colors.black,
                   onTap: () => widget.onNavigate(2),
                 ),
                 _BannerBtn(
                   label: '📤 Upload Material',
-                  bg: const Color(0xFF21262D), fg: _text,
-                  border: _border,
+                  bg: t.surface, fg: t.text,
+                  border: t.border,
                   onTap: () => Navigator.push(context,
                       MaterialPageRoute(builder: (_) => const UploadMaterialScreen())),
                 ),
                 _BannerBtn(
                   label: '👤 Add Student',
-                  bg: _blue.withValues(alpha: 0.15), fg: _blue,
-                  border: _blue,
+                  bg: t.primary.withValues(alpha: 0.15), fg: t.primary,
+                  border: t.primary,
                   onTap: () => _showAddStudentDialog(context),
                 ),
               ]),
@@ -448,7 +437,6 @@ class _DashboardContentState extends State<_DashboardContent> {
 
           const SizedBox(height: 20),
 
-          // ── Stats grid
           _StatsGrid(
             resources: _resources.length,
             quizzes:   _quizzes.length,
@@ -457,7 +445,6 @@ class _DashboardContentState extends State<_DashboardContent> {
 
           const SizedBox(height: 16),
 
-          // ── Student progress banner
           if (_stats != null && _stats!.totalStudents > 0)
             GestureDetector(
               onTap: () => widget.onNavigate(3),
@@ -465,30 +452,29 @@ class _DashboardContentState extends State<_DashboardContent> {
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: _surface, border: Border.all(color: _border),
+                  color: t.surface, border: Border.all(color: t.border),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(children: [
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Text('📊 Student Progress Overview',
-                        style: TextStyle(color: _text, fontWeight: FontWeight.w600, fontSize: 14)),
+                    Text('📊 Student Progress Overview',
+                        style: TextStyle(color: t.text, fontWeight: FontWeight.w600, fontSize: 14)),
                     const SizedBox(height: 2),
                     Text(
                       '${_stats!.totalStudents} student${_stats!.totalStudents != 1 ? "s" : ""} have attempted your quizzes · '
                       'Class avg: ${_stats!.avgScore.toStringAsFixed(1)}%',
-                      style: const TextStyle(color: _subtle, fontSize: 12),
+                      style: TextStyle(color: t.subtle, fontSize: 12),
                     ),
                   ])),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: _primary, borderRadius: BorderRadius.circular(6)),
+                    decoration: BoxDecoration(color: t.primary, borderRadius: BorderRadius.circular(6)),
                     child: const Text('View →', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
                   ),
                 ]),
               ),
             ),
 
-          // ── Recent Materials
           _SectionHeader(
             title: '📖 My Recent Materials',
             actionLabel: 'View All',
@@ -496,7 +482,7 @@ class _DashboardContentState extends State<_DashboardContent> {
           ),
           const SizedBox(height: 12),
           _resources.isEmpty
-              ? _EmptyBox(icon: '📭', message: 'No materials uploaded yet.')
+              ? _EmptyBox(message: 'No materials uploaded yet.')
               : SizedBox(
                   height: 240,
                   child: ListView.builder(
@@ -508,7 +494,6 @@ class _DashboardContentState extends State<_DashboardContent> {
 
           const SizedBox(height: 28),
 
-          // ── Recent Quizzes table
           _SectionHeader(
             title: '📊 My Recent Quizzes',
             actionLabel: '+ Create New',
@@ -516,9 +501,12 @@ class _DashboardContentState extends State<_DashboardContent> {
           ),
           const SizedBox(height: 12),
           _quizzes.isEmpty
-              ? _EmptyBox(icon: '📭', message: 'No quizzes created yet.')
-              : _QuizTable(quizzes: _quizzes.take(5).toList(), total: _quizzes.length,
-                  onViewAll: () => widget.onNavigate(2)),
+              ? _EmptyBox(message: 'No quizzes created yet.')
+              : _QuizTable(
+                  quizzes: _quizzes.take(5).toList(),
+                  total: _quizzes.length,
+                  onViewAll: () => widget.onNavigate(2),
+                ),
 
           const SizedBox(height: 24),
         ],
@@ -537,6 +525,7 @@ class _StatsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     final items = [
       (resources.toString(),                              'Materials Uploaded', '📚'),
       (quizzes.toString(),                               'Quizzes Created',    '📝'),
@@ -553,14 +542,14 @@ class _StatsGrid extends StatelessWidget {
       itemBuilder: (_, i) => Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _surface, border: Border.all(color: _border), borderRadius: BorderRadius.circular(8),
+          color: t.surface, border: Border.all(color: t.border), borderRadius: BorderRadius.circular(8),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
           Text(items[i].$1,
-              style: const TextStyle(color: _primary, fontSize: 26, fontWeight: FontWeight.w800)),
+              style: TextStyle(color: t.primary, fontSize: 26, fontWeight: FontWeight.w800)),
           const SizedBox(height: 4),
           Text(items[i].$2,
-              style: const TextStyle(color: _subtle, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+              style: TextStyle(color: t.subtle, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
         ]),
       ),
     );
@@ -574,69 +563,72 @@ class _ResourceCard extends StatelessWidget {
   const _ResourceCard({required this.resource});
 
   static const _typeColors = <String, Color>{
-    'LESSON PLAN':  Color(0xFFE3A525),
-    'WORKSHEET':    Color(0xFF2EA043),
+    'LESSON PLAN':  Color(0xFFF59E0B),
+    'WORKSHEET':    Color(0xFF10B981),
     'PRESENTATION': Color(0xFFA371F7),
-    'PDF':          Color(0xFF58A6FF),
+    'PDF':          Color(0xFF10B981), // green instead of blue
     'VIDEO':        Color(0xFFF0883E),
   };
 
-  Color get _typeColor => _typeColors[resource.type?.toUpperCase()] ?? _muted;
+  Color _typeColor(AppThemeData t) =>
+      _typeColors[resource.type?.toUpperCase()] ?? t.muted;
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
+    final tc = _typeColor(t);
     return Container(
       width: 260,
       margin: const EdgeInsets.only(right: 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _surface, border: Border.all(color: _border), borderRadius: BorderRadius.circular(8),
+        color: t.surface, border: Border.all(color: t.border), borderRadius: BorderRadius.circular(8),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: _typeColor.withValues(alpha: 0.12),
-            border: Border.all(color: _typeColor.withValues(alpha: 0.3)),
+            color: tc.withValues(alpha: 0.12),
+            border: Border.all(color: tc.withValues(alpha: 0.3)),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(resource.type ?? 'FILE',
-              style: TextStyle(color: _typeColor, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+              style: TextStyle(color: tc, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
         ),
         const SizedBox(height: 10),
         Text(resource.title,
             maxLines: 2, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: _text, fontSize: 14, fontWeight: FontWeight.w600)),
+            style: TextStyle(color: t.text, fontSize: 14, fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         Row(children: [
           if (resource.targetClassName != null) ...[
             Text('📅 ${resource.targetClassName}',
-                style: const TextStyle(color: _muted, fontSize: 11)),
+                style: TextStyle(color: t.muted, fontSize: 11)),
             const SizedBox(width: 10),
           ],
           Text('⬇️ ${resource.downloadCount}',
-              style: const TextStyle(color: _muted, fontSize: 11)),
+              style: TextStyle(color: t.muted, fontSize: 11)),
         ]),
         if (resource.description != null) ...[
           const SizedBox(height: 8),
           Expanded(child: Text(resource.description!,
               maxLines: 3, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: _subtle, fontSize: 12, height: 1.4))),
+              style: TextStyle(color: t.subtle, fontSize: 12, height: 1.4))),
         ] else const Spacer(),
         const SizedBox(height: 10),
         Row(children: [
           Expanded(child: ElevatedButton(
             onPressed: () { if (resource.fileUrl != null) {} },
             style: ElevatedButton.styleFrom(
-              backgroundColor: _red, padding: const EdgeInsets.symmetric(vertical: 8),
+              backgroundColor: t.primary, padding: const EdgeInsets.symmetric(vertical: 8),
             ),
-            child: const Text('View', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            child: const Text('View', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
           )),
           const SizedBox(width: 8),
           Expanded(child: OutlinedButton(
             onPressed: () {},
             style: OutlinedButton.styleFrom(
-              foregroundColor: _text, side: const BorderSide(color: _border),
+              foregroundColor: t.text, side: BorderSide(color: t.border),
               padding: const EdgeInsets.symmetric(vertical: 8),
             ),
             child: const Text('Edit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
@@ -657,52 +649,50 @@ class _QuizTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: _surface, border: Border.all(color: _border), borderRadius: BorderRadius.circular(8),
+        color: t.surface, border: Border.all(color: t.border), borderRadius: BorderRadius.circular(8),
       ),
       child: Column(children: [
-        // Header
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A3A2A),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+          decoration: BoxDecoration(
+            color: t.primary.withValues(alpha: 0.12),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
           ),
-          child: const Row(children: [
-            Expanded(flex: 3, child: Text('Title',   style: TextStyle(color: _text, fontSize: 12, fontWeight: FontWeight.w600))),
-            Expanded(flex: 2, child: Text('Subject', style: TextStyle(color: _text, fontSize: 12, fontWeight: FontWeight.w600))),
-            Expanded(flex: 1, child: Text('Form',    style: TextStyle(color: _text, fontSize: 12, fontWeight: FontWeight.w600))),
-            Expanded(flex: 2, child: Text('Created', style: TextStyle(color: _text, fontSize: 12, fontWeight: FontWeight.w600))),
+          child: Row(children: [
+            Expanded(flex: 3, child: Text('Title',   style: TextStyle(color: t.text, fontSize: 12, fontWeight: FontWeight.w600))),
+            Expanded(flex: 2, child: Text('Subject', style: TextStyle(color: t.text, fontSize: 12, fontWeight: FontWeight.w600))),
+            Expanded(flex: 1, child: Text('Form',    style: TextStyle(color: t.text, fontSize: 12, fontWeight: FontWeight.w600))),
+            Expanded(flex: 2, child: Text('Created', style: TextStyle(color: t.text, fontSize: 12, fontWeight: FontWeight.w600))),
           ]),
         ),
-        // Rows
         ...quizzes.asMap().entries.map((e) {
           final i = e.key; final q = e.value;
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: i.isEven ? _surface : _bg,
-              border: i < quizzes.length - 1 ? const Border(bottom: BorderSide(color: _border)) : null,
+              color: i.isEven ? t.surface : t.bg,
+              border: i < quizzes.length - 1 ? Border(bottom: BorderSide(color: t.border)) : null,
             ),
             child: Row(children: [
-              Expanded(flex: 3, child: Text(q.title, style: const TextStyle(color: _text, fontSize: 13), overflow: TextOverflow.ellipsis)),
-              Expanded(flex: 2, child: Text(q.subject ?? '—', style: const TextStyle(color: _muted, fontSize: 12))),
-              Expanded(flex: 1, child: Text(q.form    ?? '—', style: const TextStyle(color: _muted, fontSize: 12))),
-              Expanded(flex: 2, child: Text(q.formattedDate,   style: const TextStyle(color: _muted, fontSize: 12))),
+              Expanded(flex: 3, child: Text(q.title, style: TextStyle(color: t.text, fontSize: 13), overflow: TextOverflow.ellipsis)),
+              Expanded(flex: 2, child: Text(q.subject ?? '—', style: TextStyle(color: t.muted, fontSize: 12))),
+              Expanded(flex: 1, child: Text(q.form    ?? '—', style: TextStyle(color: t.muted, fontSize: 12))),
+              Expanded(flex: 2, child: Text(q.formattedDate,   style: TextStyle(color: t.muted, fontSize: 12))),
             ]),
           );
         }),
-        // View all footer
         if (total > 5)
           GestureDetector(
             onTap: onViewAll,
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: const BoxDecoration(border: Border(top: BorderSide(color: _border))),
+              decoration: BoxDecoration(border: Border(top: BorderSide(color: t.border))),
               alignment: Alignment.center,
               child: Text('View all $total quizzes →',
-                  style: const TextStyle(color: _blue, fontSize: 13)),
+                  style: TextStyle(color: t.primary, fontSize: 13)),
             ),
           ),
       ]),
@@ -734,53 +724,62 @@ class _SectionHeader extends StatelessWidget {
   final String title, actionLabel; final VoidCallback onAction;
   const _SectionHeader({required this.title, required this.actionLabel, required this.onAction});
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Text(title, style: const TextStyle(color: _text, fontSize: 18, fontWeight: FontWeight.w800)),
-      GestureDetector(
-        onTap: onAction,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: _primary, borderRadius: BorderRadius.circular(6),
+  Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(title, style: TextStyle(color: t.text, fontSize: 18, fontWeight: FontWeight.w800)),
+        GestureDetector(
+          onTap: onAction,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: t.primary, borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(actionLabel, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
           ),
-          child: Text(actionLabel, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
 class _EmptyBox extends StatelessWidget {
-  final String icon, message;
-  const _EmptyBox({required this.icon, required this.message});
+  final String message;
+  const _EmptyBox({required this.message});
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(40),
-    decoration: BoxDecoration(
-      color: _surface, border: Border.all(color: _border), borderRadius: BorderRadius.circular(8),
-    ),
-    child: Column(children: [
-      Text(icon, style: const TextStyle(fontSize: 36)),
-      const SizedBox(height: 10),
-      Text(message, style: const TextStyle(color: _subtle, fontSize: 13)),
-    ]),
-  );
+  Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: t.surface, border: Border.all(color: t.border), borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(children: [
+        const Text('📭', style: TextStyle(fontSize: 36)),
+        const SizedBox(height: 10),
+        Text(message, style: TextStyle(color: t.subtle, fontSize: 13)),
+      ]),
+    );
+  }
 }
 
 class _ErrorBanner extends StatelessWidget {
   final String message;
   const _ErrorBanner({required this.message});
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    decoration: BoxDecoration(
-      color: const Color(0xFF3D1F1F),
-      border: Border.all(color: const Color(0xFFF85149)),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Text(message, style: const TextStyle(color: Color(0xFFF85149), fontSize: 13)),
-  );
+  Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: t.errorBg,
+        border: Border.all(color: t.errorBorder),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(message, style: TextStyle(color: t.danger, fontSize: 13)),
+    );
+  }
 }

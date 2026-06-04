@@ -8,10 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/services/api_service.dart';
-import 'payment_result_screen.dart'; // PaymentResultScreen
+import '../../../core/theme/app_theme.dart';
+import 'payment_result_screen.dart';
 
-// ─── Offline service ──────────────────────────────────────────────────────────
-
+// ─── Offline service (unchanged) ──────────────────────────────────────────────
 class _OfflineService {
   static const _metaKey = 'offline_books_meta';
 
@@ -28,8 +28,7 @@ class _OfflineService {
     return file.existsSync() ? file.path : null;
   }
 
-  static Future<bool> isSaved(String bookId) async =>
-      (await localPath(bookId)) != null;
+  static Future<bool> isSaved(String bookId) async => (await localPath(bookId)) != null;
 
   static Future<void> save({
     required String bookId,
@@ -79,11 +78,7 @@ class _OfflineService {
     final prefs = await SharedPreferences.getInstance();
     final list  = await savedBooks();
     if (!list.any((b) => b['id'] == bookId)) {
-      list.add({
-        'id':      bookId,
-        'title':   title,
-        'savedAt': DateTime.now().toIso8601String(),
-      });
+      list.add({'id': bookId, 'title': title, 'savedAt': DateTime.now().toIso8601String()});
       await prefs.setString(_metaKey, jsonEncode(list));
     }
   }
@@ -96,8 +91,7 @@ class _OfflineService {
   }
 }
 
-// ─── Model ────────────────────────────────────────────────────────────────────
-
+// ─── Model (unchanged) ────────────────────────────────────────────────────────
 class _Book {
   final String  id;
   final String  title;
@@ -110,15 +104,10 @@ class _Book {
   final String? fileUrl;
 
   const _Book({
-    required this.id,
-    required this.title,
-    this.description,
-    this.categoryName,
-    this.targetClassName,
-    required this.price,
-    this.currency,
-    required this.isPurchased,
-    this.fileUrl,
+    required this.id, required this.title,
+    this.description, this.categoryName, this.targetClassName,
+    required this.price, this.currency,
+    required this.isPurchased, this.fileUrl,
   });
 
   bool get isPaid    => price > 0;
@@ -137,13 +126,13 @@ class _Book {
 
     final purchased =
         purchasedIds.contains(json['id'] as String? ?? '') ||
-        json['purchased']  == true ||
+        json['purchased']   == true ||
         json['isPurchased'] == true ||
         json['hasAccess']   == true;
 
     return _Book(
-      id:              json['id']?.toString()          ?? '',
-      title:           json['title']?.toString()       ?? 'Untitled',
+      id:              json['id']?.toString()           ?? '',
+      title:           json['title']?.toString()        ?? 'Untitled',
       description:     json['description']?.toString(),
       categoryName:    (json['category']    as Map<String, dynamic>?)?['name']?.toString(),
       targetClassName: (json['targetClass'] as Map<String, dynamic>?)?['name']?.toString(),
@@ -156,39 +145,34 @@ class _Book {
 }
 
 // ─── Subject icons ────────────────────────────────────────────────────────────
-
 const _subjectIcons = <String, IconData>{
-  'Mathematics':  Icons.calculate,
-  'Biology':      Icons.biotech,
-  'Chemistry':    Icons.science,
-  'Physics':      Icons.electric_bolt,
-  'English':      Icons.menu_book,
-  'History':      Icons.history_edu,
-  'Geography':    Icons.public,
+  'Mathematics': Icons.calculate,
+  'Biology':     Icons.biotech,
+  'Chemistry':   Icons.science,
+  'Physics':     Icons.electric_bolt,
+  'English':     Icons.menu_book,
+  'History':     Icons.history_edu,
+  'Geography':   Icons.public,
 };
 
-IconData _iconFor(String? subject) =>
-    _subjectIcons[subject ?? ''] ?? Icons.menu_book;
+IconData _iconFor(String? subject) => _subjectIcons[subject ?? ''] ?? Icons.menu_book;
 
-// ─── Colours ──────────────────────────────────────────────────────────────────
-
-const _primary = Color(0xFF2EA043);
-const _surface = Color(0xFF161B22);
-const _bg      = Color(0xFF0D1117);
-const _border  = Color(0xFF21262D);
-const _text    = Color(0xFFE6EDF3);
-const _muted   = Color(0xFF8B949E);
-const _subtle  = Color(0xFF6E7681);
-const _blue    = Color(0xFF1F6FEB);
-const _danger  = Color(0xFFF85149);
-
-// ─── Tab types ────────────────────────────────────────────────────────────────
+// ─── Gradient palette for book thumbnails ─────────────────────────────────────
+const _bookGradients = <List<Color>>[
+  [Color(0xFF059669), Color(0xFF065F46)],
+  [Color(0xFF10B981), Color(0xFF047857)],
+  [Color(0xFF8B5CF6), Color(0xFF5B21B6)],
+  [Color(0xFFF97316), Color(0xFFC2410C)],
+  [Color(0xFFF59E0B), Color(0xFFB45309)],
+  [Color(0xFF14B8A6), Color(0xFF0F766E)],
+  [Color(0xFFEF4444), Color(0xFF991B1B)],
+  [Color(0xFF34D399), Color(0xFF059669)],
+];
 
 enum _BookType { free, premium }
 enum _ViewMode { browse, offline }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
-
 class BooksScreen extends StatefulWidget {
   const BooksScreen({super.key});
   @override
@@ -208,26 +192,15 @@ class _BooksScreenState extends State<BooksScreen> {
   String    _subject  = 'All Subjects';
   int       _page     = 1;
 
-  // Offline saved books metadata
   List<Map<String, dynamic>> _savedMeta = [];
-
   static const _perPage = 12;
   final _searchCtrl = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    _fetchAll();
-    _loadOfflineMeta();
-  }
+  void initState() { super.initState(); _fetchAll(); _loadOfflineMeta(); }
 
   @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
-  // ── Fetch ──────────────────────────────────────────────────────────────────
+  void dispose() { _searchCtrl.dispose(); super.dispose(); }
 
   Future<void> _fetchAll() async {
     setState(() { _loading = true; _error = null; });
@@ -235,7 +208,6 @@ class _BooksScreenState extends State<BooksScreen> {
       final headers = await authHeaders();
       final res = await http.get(Uri.parse('$kApiBase/resources'), headers: headers);
       if (res.statusCode != 200) throw Exception('Failed to load resources');
-
       final body    = jsonDecode(res.body);
       final rawList = body is Map ? (body['data'] as List?) ?? [] : body as List;
       final all     = (rawList as List<dynamic>)
@@ -244,34 +216,22 @@ class _BooksScreenState extends State<BooksScreen> {
 
       Set<String> purchased = {};
       try {
-        // ── 1. Load locally-cached purchases (instant, set by PaymentResultScreen) ──
         final prefs    = await SharedPreferences.getInstance();
         final localRaw = prefs.getString('purchased_resource_ids') ?? '[]';
         purchased      = Set<String>.from(jsonDecode(localRaw) as List);
-
-        // ── 2. Merge with server-authoritative list ──────────────────────────
         final pr = await http.get(
-          Uri.parse('$kApiBase/payment/my-purchases'),
-          headers: headers,
-        );
+          Uri.parse('$kApiBase/payment/my-purchases'), headers: headers);
         if (pr.statusCode == 200) {
-          final pd = jsonDecode(pr.body) as Map<String, dynamic>;
+          final pd        = jsonDecode(pr.body) as Map<String, dynamic>;
           final serverIds = Set<String>.from(pd['purchased'] as List? ?? []);
-          purchased = {...purchased, ...serverIds};
-
-          // Keep local cache in sync with server truth
-          await prefs.setString(
-            'purchased_resource_ids',
-            jsonEncode(purchased.toList()),
-          );
+          purchased       = {...purchased, ...serverIds};
+          await prefs.setString('purchased_resource_ids', jsonEncode(purchased.toList()));
         }
       } catch (_) {}
 
       if (!mounted) return;
       setState(() {
-        _books = all
-            .map((e) => _Book.fromJson(e as Map<String, dynamic>, purchased))
-            .toList();
+        _books = all.map((e) => _Book.fromJson(e as Map<String, dynamic>, purchased)).toList();
       });
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -285,35 +245,17 @@ class _BooksScreenState extends State<BooksScreen> {
     if (mounted) setState(() => _savedMeta = meta);
   }
 
-  // ── Activity log ───────────────────────────────────────────────────────────
-
   Future<void> _logActivity(String action, String title) async {
     try {
       final headers = await authHeaders();
-      await http.post(
-        Uri.parse('$kApiBase/activity'),
-        headers: headers,
-        body: jsonEncode({'action': action, 'resourceTitle': title}),
-      );
+      await http.post(Uri.parse('$kApiBase/activity'), headers: headers,
+          body: jsonEncode({'action': action, 'resourceTitle': title}));
     } catch (_) {}
   }
 
-  // ── Purchase ───────────────────────────────────────────────────────────────
-  //
-  // Flow:
-  //   1. Call backend → get checkoutUrl + txRef
-  //   2. Open PayChangu checkout in external browser
-  //   3. When browser closes (user returns to app), navigate to
-  //      PaymentResultScreen which re-verifies the payment and shows status.
-  //   4. On pop from PaymentResultScreen, refresh the books list so newly
-  //      purchased books unlock immediately.
-  // ──────────────────────────────────────────────────────────────────────────
-
   Future<void> _purchase(_Book book) async {
     setState(() { _purchasing = true; _error = null; });
-
     String? txRef;
-
     try {
       final headers = await authHeaders();
       final res = await http.post(
@@ -321,42 +263,23 @@ class _BooksScreenState extends State<BooksScreen> {
         headers: headers,
         body: jsonEncode({'resourceId': book.id, 'amount': book.price}),
       );
-
-      // Surface a clean error message from the server if available
       if (res.statusCode != 200 && res.statusCode != 201) {
         Map<String, dynamic> d = {};
         try { d = jsonDecode(res.body) as Map<String, dynamic>; } catch (_) {}
         throw Exception(d['message']?.toString() ?? 'Payment initiation failed (${res.statusCode})');
       }
-
       final d   = jsonDecode(res.body) as Map<String, dynamic>;
       final url = d['checkoutUrl']?.toString() ?? d['url']?.toString();
       txRef     = d['transactionReference']?.toString();
-
-      if (url == null || url.isEmpty) {
-        throw Exception('No checkout URL returned from server');
-      }
-
-      // ── Open the PayChangu checkout page ──────────────────────────────────
+      if (url == null || url.isEmpty) throw Exception('No checkout URL returned from server');
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-
-      // ── Browser has been closed / user switched back to the app ──────────
-      // Navigate to the result screen to verify & show outcome.
       if (mounted) {
         final refreshNeeded = await Navigator.push<bool>(
           context,
-          MaterialPageRoute(
-            builder: (_) => PaymentResultScreen(
-              txRef:      txRef ?? '',
-              resourceId: book.id,
-            ),
-          ),
+          MaterialPageRoute(builder: (_) =>
+              PaymentResultScreen(txRef: txRef ?? '', resourceId: book.id)),
         );
-
-        // Re-fetch the book list so newly unlocked books appear immediately
-        if (refreshNeeded == true && mounted) {
-          await _fetchAll();
-        }
+        if (refreshNeeded == true && mounted) await _fetchAll();
       }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -365,30 +288,18 @@ class _BooksScreenState extends State<BooksScreen> {
     }
   }
 
-  // ── Preview (online, opens in browser) ────────────────────────────────────
-
   Future<void> _previewOnline(_Book book) async {
     if (book.fileUrl == null || book.fileUrl!.isEmpty) {
-      _snack('No file available for "${book.title}"');
-      return;
+      _snack('No file available for "${book.title}"'); return;
     }
     await _logActivity('RESOURCE_VIEWED', book.title);
     try {
       await launchUrl(Uri.parse(book.fileUrl!), mode: LaunchMode.externalApplication);
-    } catch (_) {
-      _snack('Could not open file');
-    }
+    } catch (_) { _snack('Could not open file'); }
   }
 
-  // ── Filtering ──────────────────────────────────────────────────────────────
-
   List<String> get _subjects {
-    final s = _books
-        .map((b) => b.categoryName)
-        .whereType<String>()
-        .toSet()
-        .toList()
-      ..sort();
+    final s = _books.map((b) => b.categoryName).whereType<String>().toSet().toList()..sort();
     return ['All Subjects', ...s];
   }
 
@@ -408,60 +319,81 @@ class _BooksScreenState extends State<BooksScreen> {
   }
 
   int get _totalPages => (_filtered.length / _perPage).ceil().clamp(1, 9999);
-
   void _resetPage() => setState(() => _page = 1);
-
   void _snack(String msg) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
-  // ── Build ──────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: t.bg,
       body: RefreshIndicator(
-        color: _primary,
+        color: t.primary,
         onRefresh: _fetchAll,
         child: _loading
-            ? const Center(child: CircularProgressIndicator(color: _primary))
+            ? Center(child: CircularProgressIndicator(color: t.primary))
             : ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  _buildViewToggle(),
+                  // ── Hero header ──────────────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [
+                        t.primary.withValues(alpha: 0.2),
+                        t.teal.withValues(alpha: 0.2),
+                      ]),
+                      border: Border.all(color: t.primary.withValues(alpha: 0.3)),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [t.primary, t.teal]),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.local_library_rounded,
+                            color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Books Library',
+                            style: TextStyle(
+                                color: t.text, fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text('Browse, read and save books offline',
+                            style: TextStyle(
+                                color: t.primary.withValues(alpha: 0.8),
+                                fontSize: 13)),
+                      ]),
+                    ]),
+                  ),
+
+                  _buildViewToggle(t),
                   const SizedBox(height: 12),
 
                   if (_viewMode == _ViewMode.offline)
-                    _buildOfflineView()
+                    _buildOfflineView(t)
                   else ...[
-                    _buildTypeToggle(),
+                    _buildTypeToggle(t),
                     const SizedBox(height: 12),
-
-                    if (_error != null)
-                      _ErrorBox(message: _error!),
-
-                    _buildSearchBar(),
+                    if (_error != null) _ErrorBox(message: _error!, theme: t),
+                    _buildSearchBar(t),
                     const SizedBox(height: 10),
-                    _buildFilters(),
-                    const SizedBox(height: 16),
-
+                    _buildFilters(t),
+                    const SizedBox(height: 14),
                     Text(
                       '${_bookType == _BookType.free ? "Free" : "Premium"} Books • ${_filtered.length} results',
-                      style: const TextStyle(color: _muted, fontSize: 13),
+                      style: TextStyle(color: t.muted, fontSize: 14),
                     ),
                     const SizedBox(height: 10),
-
                     if (_paginated.isEmpty)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 40),
-                          child: Text('No books found.', style: TextStyle(color: _subtle)),
-                        ),
-                      )
+                      _buildEmpty(t)
                     else
-                      ...(_paginated.map(_buildBookCard)),
-
-                    if (_totalPages > 1) _buildPagination(),
+                      ...(_paginated.asMap().entries.map((e) => _buildBookCard(e.value, e.key, t))),
+                    if (_totalPages > 1) _buildPagination(t),
                   ],
                 ],
               ),
@@ -469,187 +401,193 @@ class _BooksScreenState extends State<BooksScreen> {
     );
   }
 
-  // ── View toggle (Browse / Offline) ────────────────────────────────────────
-
-  Widget _buildViewToggle() {
-    return Row(children: [
-      Expanded(child: _TypeBtn(
-        label: '📚 Browse',
-        icon: Icons.local_library_outlined,
-        selected: _viewMode == _ViewMode.browse,
-        onTap: () => setState(() => _viewMode = _ViewMode.browse),
-      )),
-      const SizedBox(width: 10),
-      Expanded(child: _TypeBtn(
-        label: '📥 Offline (${_savedMeta.length})',
-        icon: Icons.download_done_rounded,
-        selected: _viewMode == _ViewMode.offline,
-        onTap: () {
-          setState(() => _viewMode = _ViewMode.offline);
-          _loadOfflineMeta();
-        },
-      )),
-    ]);
-  }
-
-  // ── Free / Premium toggle ──────────────────────────────────────────────────
-
-  Widget _buildTypeToggle() {
-    return Row(children: [
-      Expanded(child: _TypeBtn(
-        label: 'Free Books',
-        icon: Icons.book_outlined,
-        selected: _bookType == _BookType.free,
-        onTap: () => setState(() { _bookType = _BookType.free; _page = 1; }),
-      )),
-      const SizedBox(width: 10),
-      Expanded(child: _TypeBtn(
-        label: 'Premium',
-        icon: Icons.star,
-        selected: _bookType == _BookType.premium,
-        isPremium: true,
-        onTap: () => setState(() { _bookType = _BookType.premium; _page = 1; }),
-      )),
-    ]);
-  }
-
-  // ── Search ────────────────────────────────────────────────────────────────
-
-  Widget _buildSearchBar() {
-    return TextField(
-      controller: _searchCtrl,
-      style: const TextStyle(color: _text),
-      decoration: InputDecoration(
-        hintText: 'Search books...',
-        hintStyle: const TextStyle(color: _subtle),
-        prefixIcon: const Icon(Icons.search, color: _muted),
-        filled: true, fillColor: _surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _border),
+  Widget _buildEmpty(AppThemeData t) => Container(
+        margin: const EdgeInsets.symmetric(vertical: 40),
+        padding: const EdgeInsets.all(40),
+        decoration: BoxDecoration(
+          color: t.surface,
+          border: Border.all(color: t.border),
+          borderRadius: BorderRadius.circular(20),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _border),
+        child: Column(children: [
+          Icon(Icons.menu_book_rounded, size: 44, color: t.subtle),
+          const SizedBox(height: 14),
+          Text('No books found.', style: TextStyle(color: t.subtle, fontSize: 15)),
+        ]),
+      );
+
+  Widget _buildViewToggle(AppThemeData t) => Row(children: [
+        Expanded(child: _ToggleBtn(
+          label: '📚 Browse',
+          icon: Icons.local_library_outlined,
+          selected: _viewMode == _ViewMode.browse,
+          theme: t,
+          onTap: () => setState(() => _viewMode = _ViewMode.browse),
+        )),
+        const SizedBox(width: 10),
+        Expanded(child: _ToggleBtn(
+          label: '📥 Offline (${_savedMeta.length})',
+          icon: Icons.download_done_rounded,
+          selected: _viewMode == _ViewMode.offline,
+          theme: t,
+          onTap: () { setState(() => _viewMode = _ViewMode.offline); _loadOfflineMeta(); },
+        )),
+      ]);
+
+  Widget _buildTypeToggle(AppThemeData t) => Row(children: [
+        Expanded(child: _ToggleBtn(
+          label: 'Free Books',
+          icon: Icons.book_outlined,
+          selected: _bookType == _BookType.free,
+          theme: t,
+          onTap: () => setState(() { _bookType = _BookType.free; _page = 1; }),
+        )),
+        const SizedBox(width: 10),
+        Expanded(child: _ToggleBtn(
+          label: 'Premium',
+          icon: Icons.star,
+          selected: _bookType == _BookType.premium,
+          isPremium: true,
+          theme: t,
+          onTap: () => setState(() { _bookType = _BookType.premium; _page = 1; }),
+        )),
+      ]);
+
+  Widget _buildSearchBar(AppThemeData t) => TextField(
+        controller: _searchCtrl,
+        style: TextStyle(color: t.text, fontSize: 15),
+        decoration: InputDecoration(
+          hintText:  'Search books...',
+          hintStyle: TextStyle(color: t.subtle),
+          prefixIcon: Icon(Icons.search, color: t.muted),
+          filled:    true,
+          fillColor: t.inputFill,
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+          border:        OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: t.border)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: t.border)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: t.primary)),
         ),
-      ),
-      onChanged: (v) { _search = v; _resetPage(); },
-    );
-  }
+        onChanged: (v) { _search = v; _resetPage(); },
+      );
 
-  // ── Filters ───────────────────────────────────────────────────────────────
-
-  Widget _buildFilters() {
-    return Row(children: [
-      Expanded(child: _buildDropdown(
-        value: _level,
-        items: const ['All Levels', 'Form 1', 'Form 2', 'Form 3', 'Form 4'],
-        label: 'Level',
-        onChanged: (v) { setState(() => _level = v!); _resetPage(); },
-      )),
-      const SizedBox(width: 10),
-      Expanded(child: _buildDropdown(
-        value: _subject,
-        items: _subjects,
-        label: 'Subject',
-        onChanged: (v) { setState(() => _subject = v!); _resetPage(); },
-      )),
-    ]);
-  }
+  Widget _buildFilters(AppThemeData t) => Row(children: [
+        Expanded(child: _buildDropdown(
+          value: _level,
+          items: const ['All Levels', 'Form 1', 'Form 2', 'Form 3', 'Form 4'],
+          label: 'Level',
+          theme: t,
+          onChanged: (v) { setState(() => _level = v!); _resetPage(); },
+        )),
+        const SizedBox(width: 10),
+        Expanded(child: _buildDropdown(
+          value: _subject,
+          items: _subjects,
+          label: 'Subject',
+          theme: t,
+          onChanged: (v) { setState(() => _subject = v!); _resetPage(); },
+        )),
+      ]);
 
   Widget _buildDropdown({
-    required String value,
-    required List<String> items,
-    required String label,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return DropdownButtonFormField<String>(
-      value: items.contains(value) ? value : items.first,
-      isExpanded: true,
-      dropdownColor: _surface,
-      style: const TextStyle(color: _text, fontSize: 14),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: _muted),
-        filled: true, fillColor: _surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _border),
+    required String value, required List<String> items,
+    required String label, required ValueChanged<String?> onChanged,
+    required AppThemeData theme,
+  }) =>
+      DropdownButtonFormField<String>(
+        value: items.contains(value) ? value : items.first,
+        isExpanded: true,
+        dropdownColor: theme.surface,
+        style: TextStyle(color: theme.text, fontSize: 14),
+        decoration: InputDecoration(
+          labelText:  label,
+          labelStyle: TextStyle(color: theme.muted, fontSize: 13),
+          filled:     true, fillColor: theme.dropdownFill,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          border:        OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: theme.border)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: theme.border)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: theme.primary)),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _border),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      ),
-      items: items
-          .map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis)))
-          .toList(),
-      onChanged: onChanged,
-    );
-  }
+        items: items
+            .map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis)))
+            .toList(),
+        onChanged: onChanged,
+      );
 
-  // ── Book card ─────────────────────────────────────────────────────────────
-
-  Widget _buildBookCard(_Book book) {
+  Widget _buildBookCard(_Book book, int index, AppThemeData t) {
+    final gradient = _bookGradients[index % _bookGradients.length];
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _surface,
-        border: Border.all(color: _border),
-        borderRadius: BorderRadius.circular(8),
+        color: t.surface,
+        border: Border.all(color: t.border),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Thumbnail
         Container(
-          width: 52, height: 64,
+          width: 56, height: 68,
           decoration: BoxDecoration(
-            color: const Color(0xFF21262D),
-            borderRadius: BorderRadius.circular(6),
+            gradient: LinearGradient(
+              colors: gradient,
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(_iconFor(book.categoryName), color: _text, size: 28),
+          child: Icon(_iconFor(book.categoryName), color: Colors.white54, size: 28),
         ),
         const SizedBox(width: 14),
 
-        // Info
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(book.title,
-              style: const TextStyle(color: _text, fontWeight: FontWeight.w700, fontSize: 15)),
+              style: TextStyle(
+                  color: t.text, fontWeight: FontWeight.w700, fontSize: 16)),
 
           if (book.description != null)
             Text(book.description!,
                 maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: _subtle, fontSize: 12)),
+                style: TextStyle(color: t.subtle, fontSize: 13)),
 
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
 
           Wrap(spacing: 8, runSpacing: 6, children: [
             if (book.categoryName != null)
-              _Tag(label: book.categoryName!, color: _primary),
+              _Tag(label: book.categoryName!, color: t.primary, theme: t),
             if (book.targetClassName != null)
-              _Tag(label: book.targetClassName!, outlined: true),
+              _Tag(label: book.targetClassName!, outlined: true, theme: t),
             _Tag(
               label: book.isPaid ? 'Paid • ${book.formattedPrice}' : 'Free',
-              color: book.isPaid ? _blue : _primary,
+              color: book.isPaid ? t.amber : t.primary,
+              theme: t,
             ),
             if (book.isPurchased && book.isPaid)
-              const _Tag(label: '✓ Purchased', color: Color(0xFF16A34A)),
+              _Tag(label: '✓ Purchased', color: t.primary, theme: t),
           ]),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          // Actions
           if (book.canAccess)
             _BookActions(
               book: book,
+              theme: t,
               onPreview: () => _previewOnline(book),
               onOfflineSaved: _loadOfflineMeta,
             )
           else
             _Btn(
               label: _purchasing ? 'Processing...' : '💳 Buy ${book.formattedPrice}',
-              color: _blue,
+              color: t.primary,
               onTap: _purchasing ? () {} : () => _purchase(book),
             ),
         ])),
@@ -657,80 +595,60 @@ class _BooksScreenState extends State<BooksScreen> {
     );
   }
 
-  // ── Offline view ──────────────────────────────────────────────────────────
-
-  Widget _buildOfflineView() {
+  Widget _buildOfflineView(AppThemeData t) {
     if (_savedMeta.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
         decoration: BoxDecoration(
-          color: _surface,
-          border: Border.all(color: _border),
-          borderRadius: BorderRadius.circular(8),
+          color: t.surface, border: Border.all(color: t.border),
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: const Column(children: [
-          Text('📥', style: TextStyle(fontSize: 40)),
-          SizedBox(height: 12),
+        child: Column(children: [
+          const Text('📥', style: TextStyle(fontSize: 44)),
+          const SizedBox(height: 14),
           Text('No books saved for offline reading.',
-              style: TextStyle(color: _subtle, fontSize: 14),
-              textAlign: TextAlign.center),
-          SizedBox(height: 6),
+              style: TextStyle(color: t.subtle, fontSize: 15), textAlign: TextAlign.center),
+          const SizedBox(height: 6),
           Text('Browse books and tap "Save Offline" to read without internet.',
-              style: TextStyle(color: _subtle, fontSize: 12),
-              textAlign: TextAlign.center),
+              style: TextStyle(color: t.subtle, fontSize: 13), textAlign: TextAlign.center),
         ]),
       );
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('${_savedMeta.length} book${_savedMeta.length != 1 ? "s" : ""} saved',
-            style: const TextStyle(color: _muted, fontSize: 13)),
+            style: TextStyle(color: t.muted, fontSize: 14)),
         const SizedBox(height: 10),
         ..._savedMeta.map((meta) => _OfflineBookTile(
-          meta: meta,
-          onRemoved: _loadOfflineMeta,
-        )),
+              meta: meta, theme: t, onRemoved: _loadOfflineMeta)),
       ],
     );
   }
 
-  // ── Pagination ────────────────────────────────────────────────────────────
-
-  Widget _buildPagination() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        IconButton(
-          icon: const Icon(Icons.chevron_left),
-          color: _page == 1 ? _subtle : _text,
-          onPressed: _page == 1 ? null : () => setState(() => _page--),
-        ),
-        Text('$_page / $_totalPages', style: const TextStyle(color: _text)),
-        IconButton(
-          icon: const Icon(Icons.chevron_right),
-          color: _page == _totalPages ? _subtle : _text,
-          onPressed: _page == _totalPages ? null : () => setState(() => _page++),
-        ),
-      ]),
-    );
-  }
+  Widget _buildPagination(AppThemeData t) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          _PagBtn(icon: Icons.chevron_left, enabled: _page > 1, theme: t,
+              onTap: () => setState(() => _page--)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('$_page / $_totalPages',
+                style: TextStyle(color: t.text, fontSize: 15)),
+          ),
+          _PagBtn(icon: Icons.chevron_right, enabled: _page < _totalPages, theme: t,
+              onTap: () => setState(() => _page++)),
+        ]),
+      );
 }
 
-// ─── Book Actions widget ──────────────────────────────────────────────────────
-
+// ─── Book Actions ─────────────────────────────────────────────────────────────
 class _BookActions extends StatefulWidget {
   final _Book        book;
+  final AppThemeData theme;
   final VoidCallback onPreview;
   final VoidCallback onOfflineSaved;
-
-  const _BookActions({
-    required this.book,
-    required this.onPreview,
-    required this.onOfflineSaved,
-  });
-
+  const _BookActions({required this.book, required this.theme, required this.onPreview, required this.onOfflineSaved});
   @override
   State<_BookActions> createState() => _BookActionsState();
 }
@@ -741,10 +659,7 @@ class _BookActionsState extends State<_BookActions> {
   double _progress = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _checkSaved();
-  }
+  void initState() { super.initState(); _checkSaved(); }
 
   Future<void> _checkSaved() async {
     final s = await _OfflineService.isSaved(widget.book.id);
@@ -753,15 +668,13 @@ class _BookActionsState extends State<_BookActions> {
 
   Future<void> _saveOffline() async {
     if (widget.book.fileUrl == null || widget.book.fileUrl!.isEmpty) {
-      _snack('No file available to save.');
-      return;
+      _snack('No file available to save.'); return;
     }
     setState(() { _saving = true; _progress = 0; });
     try {
       await _OfflineService.save(
-        bookId:   widget.book.id,
-        title:    widget.book.title,
-        fileUrl:  widget.book.fileUrl!,
+        bookId:  widget.book.id, title: widget.book.title,
+        fileUrl: widget.book.fileUrl!,
         onProgress: (p) { if (mounted) setState(() => _progress = p); },
       );
       if (mounted) {
@@ -777,13 +690,9 @@ class _BookActionsState extends State<_BookActions> {
 
   Future<void> _openOffline() async {
     final path = await _OfflineService.localPath(widget.book.id);
-    if (path == null || !mounted) {
-      _snack('File not found. Please save it again.');
-      return;
-    }
+    if (path == null || !mounted) { _snack('File not found. Please save it again.'); return; }
     Navigator.push(context, MaterialPageRoute(
-      builder: (_) => _PdfViewerScreen(localPath: path, title: widget.book.title),
-    ));
+        builder: (_) => _PdfViewerScreen(localPath: path, title: widget.book.title, theme: widget.theme)));
   }
 
   Future<void> _removeOffline() async {
@@ -800,59 +709,48 @@ class _BookActionsState extends State<_BookActions> {
 
   @override
   Widget build(BuildContext context) {
-    // Saving progress
+    final t = widget.theme;
     if (_saving) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const SizedBox(
-            width: 12, height: 12,
-            child: CircularProgressIndicator(strokeWidth: 2, color: _primary),
-          ),
+          SizedBox(width: 14, height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2, color: t.primary)),
           const SizedBox(width: 8),
-          Text(
-            'Saving... ${(_progress * 100).toInt()}%',
-            style: const TextStyle(color: _muted, fontSize: 12),
-          ),
+          Text('Saving... ${(_progress * 100).toInt()}%',
+              style: TextStyle(color: t.muted, fontSize: 13)),
         ]),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         ClipRRect(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(6),
           child: LinearProgressIndicator(
             value: _progress,
-            backgroundColor: const Color(0xFF21262D),
-            valueColor: const AlwaysStoppedAnimation(_primary),
-            minHeight: 5,
+            backgroundColor: t.border,
+            valueColor: AlwaysStoppedAnimation(t.primary),
+            minHeight: 6,
           ),
         ),
       ]);
     }
-
-    // Already saved
     if (_saved) {
-      return Row(children: [
-        _Btn(label: '📖 Read', color: _primary, onTap: _openOffline),
-        const SizedBox(width: 8),
-        _Btn(label: '👁️ Preview', color: _blue, onTap: widget.onPreview),
-        const SizedBox(width: 8),
-        _IconBtn(icon: Icons.delete_outline, color: _danger, onTap: _removeOffline),
+      return Wrap(spacing: 8, runSpacing: 8, children: [
+        _Btn(label: '📖 Read',    color: t.primary, onTap: _openOffline),
+        _Btn(label: '👁️ Preview', color: t.teal,   onTap: widget.onPreview),
+        _IconBtn(icon: Icons.delete_outline, color: t.danger, onTap: _removeOffline),
       ]);
     }
-
-    // Not saved
-    return Row(children: [
-      _Btn(label: '👁️ Preview', color: _blue, onTap: widget.onPreview),
-      const SizedBox(width: 8),
-      _Btn(label: '💾 Save Offline', color: _primary, onTap: _saveOffline),
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      _Btn(label: '👁️ Preview',    color: t.teal,   onTap: widget.onPreview),
+      _Btn(label: '💾 Save Offline', color: t.primary, onTap: _saveOffline),
     ]);
   }
 }
 
-// ─── Offline book tile (used in offline view) ─────────────────────────────────
-
+// ─── Offline tile ─────────────────────────────────────────────────────────────
 class _OfflineBookTile extends StatefulWidget {
   final Map<String, dynamic> meta;
+  final AppThemeData          theme;
   final VoidCallback          onRemoved;
-  const _OfflineBookTile({required this.meta, required this.onRemoved});
+  const _OfflineBookTile({required this.meta, required this.theme, required this.onRemoved});
   @override
   State<_OfflineBookTile> createState() => _OfflineBookTileState();
 }
@@ -861,12 +759,8 @@ class _OfflineBookTileState extends State<_OfflineBookTile> {
   Future<void> _open() async {
     final path = await _OfflineService.localPath(widget.meta['id']);
     if (path == null || !mounted) return;
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => _PdfViewerScreen(
-        localPath: path,
-        title:     widget.meta['title'] ?? 'Book',
-      ),
-    ));
+    Navigator.push(context, MaterialPageRoute(builder: (_) =>
+        _PdfViewerScreen(localPath: path, title: widget.meta['title'] ?? 'Book', theme: widget.theme)));
   }
 
   Future<void> _remove() async {
@@ -881,52 +775,49 @@ class _OfflineBookTileState extends State<_OfflineBookTile> {
       final dt = DateTime.parse(raw).toLocal();
       const m = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       return 'Saved ${dt.day} ${m[dt.month]} ${dt.year}';
-    } catch (_) {
-      return '';
-    }
+    } catch (_) { return ''; }
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = widget.theme;
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _surface,
-        border: Border.all(color: _border),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(children: [
-        Container(
-          width: 44, height: 52,
-          decoration: BoxDecoration(
-            color: _primary.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: const Icon(Icons.picture_as_pdf, color: _primary, size: 24),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: t.surface, border: Border.all(color: t.border),
+          borderRadius: BorderRadius.circular(16),
         ),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(widget.meta['title'] ?? 'Book',
-              style: const TextStyle(color: _text, fontWeight: FontWeight.w700, fontSize: 14)),
-          if (_savedDate().isNotEmpty)
-            Text(_savedDate(), style: const TextStyle(color: _subtle, fontSize: 11)),
-        ])),
-        const SizedBox(width: 8),
-        _Btn(label: '📖 Read', color: _primary, onTap: _open),
-        const SizedBox(width: 6),
-        _IconBtn(icon: Icons.delete_outline, color: _danger, onTap: _remove),
-      ]),
-    );
+        child: Row(children: [
+          Container(
+            width: 48, height: 56,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [t.primary, const Color(0xFF065F46)]),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.picture_as_pdf, color: Colors.white54, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(widget.meta['title'] ?? 'Book',
+                style: TextStyle(color: t.text, fontWeight: FontWeight.w700, fontSize: 15)),
+            if (_savedDate().isNotEmpty)
+              Text(_savedDate(), style: TextStyle(color: t.subtle, fontSize: 12)),
+          ])),
+          const SizedBox(width: 8),
+          _Btn(label: '📖 Read', color: t.primary, onTap: _open),
+          const SizedBox(width: 8),
+          _IconBtn(icon: Icons.delete_outline, color: t.danger, onTap: _remove),
+        ]),
+      );
   }
 }
 
-// ─── PDF Viewer screen ────────────────────────────────────────────────────────
-
+// ─── PDF Viewer ───────────────────────────────────────────────────────────────
 class _PdfViewerScreen extends StatefulWidget {
-  final String localPath;
-  final String title;
-  const _PdfViewerScreen({required this.localPath, required this.title});
+  final String localPath, title;
+  final AppThemeData theme;
+  const _PdfViewerScreen({required this.localPath, required this.title, required this.theme});
   @override
   State<_PdfViewerScreen> createState() => _PdfViewerScreenState();
 }
@@ -939,33 +830,30 @@ class _PdfViewerScreenState extends State<_PdfViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = widget.theme;
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: t.bg,
       appBar: AppBar(
         title: Text(widget.title,
-            style: const TextStyle(color: _text, fontSize: 15),
+            style: TextStyle(color: t.text, fontSize: 16),
             overflow: TextOverflow.ellipsis),
-        backgroundColor: _bg,
-        foregroundColor: _text,
+        backgroundColor: t.surface,
+        foregroundColor: t.text,
+        elevation: 0,
         actions: [
           if (_ready)
             Padding(
               padding: const EdgeInsets.only(right: 16),
-              child: Center(child: Text(
-                '$_current / $_pages',
-                style: const TextStyle(color: _muted, fontSize: 13),
-              )),
+              child: Center(child: Text('$_current / $_pages',
+                  style: TextStyle(color: t.muted, fontSize: 14))),
             ),
         ],
       ),
       body: Stack(children: [
         PDFView(
           filePath: widget.localPath,
-          enableSwipe: true,
-          swipeHorizontal: true,
-          autoSpacing: true,
-          pageFling: true,
-          pageSnap: true,
+          enableSwipe: true, swipeHorizontal: true,
+          autoSpacing: true, pageFling: true, pageSnap: true,
           fitPolicy: FitPolicy.BOTH,
           onRender: (pages) {
             if (mounted) setState(() { _pages = pages ?? 0; _ready = true; });
@@ -975,31 +863,26 @@ class _PdfViewerScreenState extends State<_PdfViewerScreen> {
             if (mounted) setState(() => _current = (page ?? 0) + 1);
           },
           onError: (e) => ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e'))),
+              SnackBar(content: Text('Error: $e'))),
         ),
-        if (!_ready)
-          const Center(child: CircularProgressIndicator(color: _primary)),
+        if (!_ready) Center(child: CircularProgressIndicator(color: t.primary)),
       ]),
       bottomNavigationBar: _ready && _pages > 1
           ? Container(
-              height: 52,
-              color: _surface,
+              height: 56,
+              color: t.surface,
               child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 IconButton(
                   icon: const Icon(Icons.chevron_left),
-                  color: _current == 1 ? _subtle : _text,
-                  onPressed: _current == 1
-                      ? null
-                      : () => _ctrl?.setPage(_current - 2),
+                  color: _current == 1 ? t.subtle : t.text,
+                  onPressed: _current == 1 ? null : () => _ctrl?.setPage(_current - 2),
                 ),
                 Text('Page $_current of $_pages',
-                    style: const TextStyle(color: _muted, fontSize: 13)),
+                    style: TextStyle(color: t.muted, fontSize: 14)),
                 IconButton(
                   icon: const Icon(Icons.chevron_right),
-                  color: _current == _pages ? _subtle : _text,
-                  onPressed: _current == _pages
-                      ? null
-                      : () => _ctrl?.setPage(_current),
+                  color: _current == _pages ? t.subtle : t.text,
+                  onPressed: _current == _pages ? null : () => _ctrl?.setPage(_current),
                 ),
               ]),
             )
@@ -1008,58 +891,64 @@ class _PdfViewerScreenState extends State<_PdfViewerScreen> {
   }
 }
 
-// ─── Small shared widgets ─────────────────────────────────────────────────────
+// ─── Shared small widgets ─────────────────────────────────────────────────────
 
 class _ErrorBox extends StatelessWidget {
   final String message;
-  const _ErrorBox({required this.message});
+  final AppThemeData theme;
+  const _ErrorBox({required this.message, required this.theme});
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: const Color(0xFF3D1A1A),
-      border: Border.all(color: _danger),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Text(message, style: const TextStyle(color: _danger)),
-  );
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: theme.errorBg,
+          border: Border.all(color: theme.errorBorder),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(children: [
+          Icon(Icons.error_outline_rounded, color: theme.danger, size: 18),
+          const SizedBox(width: 8),
+          Expanded(child: Text(message,
+              style: TextStyle(color: theme.danger, fontSize: 14))),
+        ]),
+      );
 }
 
-class _TypeBtn extends StatelessWidget {
+class _ToggleBtn extends StatelessWidget {
   final String     label;
   final IconData   icon;
   final bool       selected;
   final bool       isPremium;
+  final AppThemeData theme;
   final VoidCallback onTap;
-
-  const _TypeBtn({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-    this.isPremium = false,
+  const _ToggleBtn({
+    required this.label, required this.icon,
+    required this.selected, required this.onTap,
+    required this.theme, this.isPremium = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = isPremium ? Colors.amber : _primary;
-    return InkWell(
+    final activeColor = isPremium ? theme.amber : theme.primary;
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color:  selected ? activeColor : _surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: selected ? activeColor : _border, width: 2),
+          color: selected ? activeColor.withValues(alpha: 0.15) : theme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: selected ? activeColor : theme.border, width: 1.5),
         ),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, color: selected ? Colors.white : _muted),
+          Icon(icon, color: selected ? activeColor : theme.muted, size: 18),
           const SizedBox(width: 8),
           Text(label, style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: selected ? Colors.white : _muted,
+            fontWeight: FontWeight.w600,
+            fontSize:   14,
+            color: selected ? activeColor : theme.muted,
           )),
         ]),
       ),
@@ -1071,20 +960,22 @@ class _Tag extends StatelessWidget {
   final String label;
   final Color? color;
   final bool   outlined;
-  const _Tag({required this.label, this.color, this.outlined = false});
+  final AppThemeData theme;
+  const _Tag({required this.label, required this.theme, this.color, this.outlined = false});
+
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-    decoration: BoxDecoration(
-      color: outlined ? Colors.transparent : color?.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(4),
-      border: outlined ? Border.all(color: _border) : null,
-    ),
-    child: Text(label, style: TextStyle(
-      fontSize: 11, fontWeight: FontWeight.w600,
-      color: outlined ? _subtle : (color ?? _primary),
-    )),
-  );
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        decoration: BoxDecoration(
+          color: outlined ? Colors.transparent : color?.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(6),
+          border: outlined ? Border.all(color: theme.border) : null,
+        ),
+        child: Text(label, style: TextStyle(
+          fontSize: 12, fontWeight: FontWeight.w600,
+          color: outlined ? theme.subtle : (color ?? theme.primary),
+        )),
+      );
 }
 
 class _Btn extends StatelessWidget {
@@ -1092,17 +983,24 @@ class _Btn extends StatelessWidget {
   final Color      color;
   final VoidCallback onTap;
   const _Btn({required this.label, required this.color, required this.onTap});
+
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
-      child: Text(label, style: const TextStyle(
-        color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600,
-      )),
-    ),
-  );
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+                colors: [color, color.withValues(alpha: 0.85)]),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [BoxShadow(
+                color: color.withValues(alpha: 0.25),
+                blurRadius: 8, offset: const Offset(0, 3))],
+          ),
+          child: Text(label, style: const TextStyle(
+              color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+        ),
+      );
 }
 
 class _IconBtn extends StatelessWidget {
@@ -1110,17 +1008,39 @@ class _IconBtn extends StatelessWidget {
   final Color      color;
   final VoidCallback onTap;
   const _IconBtn({required this.icon, required this.color, required this.onTap});
+
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.all(7),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Icon(icon, color: color, size: 18),
-    ),
-  );
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            border: Border.all(color: color.withValues(alpha: 0.4)),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+      );
+}
+
+class _PagBtn extends StatelessWidget {
+  final IconData   icon;
+  final bool       enabled;
+  final AppThemeData theme;
+  final VoidCallback onTap;
+  const _PagBtn({required this.icon, required this.enabled, required this.onTap, required this.theme});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: enabled ? onTap : null,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            border: Border.all(color: enabled ? theme.border : theme.border.withValues(alpha: 0.4)),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: enabled ? theme.text : theme.subtle, size: 20),
+        ),
+      );
 }

@@ -6,17 +6,18 @@ class WelcomeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
+        color: t.heroBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: t.heroBorder),
       ),
-      child: const Text(
+      child: Text(
         'Welcome to the E-Library!',
         style: TextStyle(
-          color: AppColors.text,
+          color: t.text,
           fontSize: 18,
           fontWeight: FontWeight.bold,
         ),

@@ -8,30 +8,32 @@ class StudentDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
+
     return Drawer(
-      backgroundColor: AppColors.surface,
+      backgroundColor: t.surface,
       child: Column(
         children: [
           DrawerHeader(
-            decoration: const BoxDecoration(color: AppColors.surface),
+            decoration: BoxDecoration(color: t.surface),
             child: Row(
-              children: const [
-                Icon(Icons.menu_book_rounded, color: AppColors.primary),
-                SizedBox(width: 10),
+              children: [
+                Icon(Icons.menu_book_rounded, color: t.primary),
+                const SizedBox(width: 10),
                 Text(
                   'EduLib Malawi',
-                  style: TextStyle(color: AppColors.text, fontSize: 18),
+                  style: TextStyle(color: t.text, fontSize: 18),
                 ),
               ],
             ),
           ),
-          drawerItem('Home'),
-          drawerItem('Resources'),
-          drawerItem('Quizzes'),
-          drawerItem('Past Papers'),
+          _drawerItem(context, 'Home',       Icons.home_rounded,       t),
+          _drawerItem(context, 'Resources',  Icons.library_books_rounded, t),
+          _drawerItem(context, 'Quizzes',    Icons.quiz_rounded,       t),
+          _drawerItem(context, 'Past Papers',Icons.history_edu_rounded, t),
           const Spacer(),
-          drawerItem(
-            'Settings',
+          _drawerItem(
+            context, 'Settings', Icons.settings_rounded, t,
             onTap: () {
               Navigator.of(context).pop();
               Navigator.of(context).push(
@@ -39,19 +41,28 @@ class StudentDrawer extends StatelessWidget {
               );
             },
           ),
-          drawerItem('Logout', color: AppColors.accent4),
+          _drawerItem(
+            context, 'Logout', Icons.logout_rounded, t,
+            color: t.danger,
+          ),
+          const SizedBox(height: 12),
         ],
       ),
     );
   }
 
-  Widget drawerItem(
-    String text, {
-    Color color = AppColors.text2,
+  Widget _drawerItem(
+    BuildContext context,
+    String text,
+    IconData icon,
+    AppThemeData t, {
+    Color? color,
     VoidCallback? onTap,
   }) {
+    final c = color ?? t.text;
     return ListTile(
-      title: Text(text, style: TextStyle(color: color)),
+      leading: Icon(icon, color: c, size: 20),
+      title: Text(text, style: TextStyle(color: c, fontSize: 15)),
       onTap: onTap,
     );
   }

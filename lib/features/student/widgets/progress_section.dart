@@ -6,20 +6,31 @@ class ProgressSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     return Card(
+      color: t.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: t.border),
+      ),
+      elevation: 0,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const Text('Reading Progress', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Reading Progress',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: t.text)),
             const SizedBox(height: 8),
             LinearProgressIndicator(
-              value: 0.7, // Example progress
-              backgroundColor: AppColors.surface2,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              value: 0.7,
+              backgroundColor: t.surface2,
+              valueColor: AlwaysStoppedAnimation<Color>(t.primary),
             ),
             const SizedBox(height: 8),
-            const Text('70% completed'),
+            Text('70% completed', style: TextStyle(color: t.muted)),
           ],
         ),
       ),

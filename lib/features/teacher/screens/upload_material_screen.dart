@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/services/api_service.dart';
 
 const _resourceTypes = [
@@ -28,16 +29,6 @@ MediaType _mimeFor(String ext) {
   }
 }
 
-const _bg      = Color(0xFF0D1117);
-const _surface = Color(0xFF161B22);
-const _border  = Color(0xFF21262D);
-const _text    = Color(0xFFE6EDF3);
-const _muted   = Color(0xFF8B949E);
-const _subtle  = Color(0xFF6E7681);
-const _primary = Color(0xFF2EA043);
-const _danger  = Color(0xFFF85149);
-const _amber   = Color(0xFFE3A525);
-
 class UploadModal extends StatefulWidget {
   final VoidCallback onClose;
   final VoidCallback onUploaded;
@@ -55,7 +46,6 @@ class UploadModal extends StatefulWidget {
 }
 
 class _UploadModalState extends State<UploadModal> {
-  // Form values
   String        _title          = '';
   String        _description    = '';
   String?       _categoryId;
@@ -70,11 +60,8 @@ class _UploadModalState extends State<UploadModal> {
   bool          _uploading      = false;
   double        _progress       = 0;
 
-  // Dropdown data
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _classes    = [];
-
-  // Teacher's school (fetched from profile)
   String? _teacherSchoolId;
 
   @override
@@ -86,31 +73,21 @@ class _UploadModalState extends State<UploadModal> {
   Future<void> _loadAll() async {
     try {
       final headers = await authHeaders();
-
-      // Fetch profile, categories, classes in parallel
       final results = await Future.wait([
         http.get(Uri.parse('$kApiBase/auth/me'),    headers: headers),
         http.get(Uri.parse('$kApiBase/categories'), headers: headers),
         http.get(Uri.parse('$kApiBase/classes'),    headers: headers),
       ]);
-
-      // Profile → schoolId
       if (results[0].statusCode == 200) {
-        final d = jsonDecode(results[0].body);
-        final id = d['schoolId']
-            ?? d['school']?['id']
-            ?? d['data']?['schoolId'];
+        final d  = jsonDecode(results[0].body);
+        final id = d['schoolId'] ?? d['school']?['id'] ?? d['data']?['schoolId'];
         if (id != null) setState(() => _teacherSchoolId = id.toString());
       }
-
-      // Categories
       if (results[1].statusCode == 200) {
         final d = jsonDecode(results[1].body);
         setState(() => _categories = List<Map<String, dynamic>>.from(
             d is List ? d : (d['data'] ?? [])));
       }
-
-      // Classes — sorted numerically
       if (results[2].statusCode == 200) {
         final d    = jsonDecode(results[2].body);
         final list = List<Map<String, dynamic>>.from(
@@ -147,7 +124,6 @@ class _UploadModalState extends State<UploadModal> {
   }
 
   Future<void> _upload() async {
-    // Validation
     if (_title.trim().isEmpty) {
       widget.toast('Please enter a title.', type: 'error'); return;
     }
@@ -160,13 +136,10 @@ class _UploadModalState extends State<UploadModal> {
     if (_pickedFile == null || _fileBytes == null) {
       widget.toast('Please select a file.', type: 'error'); return;
     }
-
     setState(() { _uploading = true; _progress = 0; });
-
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('accessToken') ?? '';
-
       final uri     = Uri.parse('$kApiBase/resources/create-with-file');
       final request = http.MultipartRequest('POST', uri)
         ..headers['Authorization'] = 'Bearer $token'
@@ -187,24 +160,21 @@ class _UploadModalState extends State<UploadModal> {
           filename:    _pickedFile!.name,
           contentType: _mimeFor(_pickedFile!.extension ?? ''),
         ));
-
-      // Only send schoolId when visibility is PRIVATE
       if (_visibility == 'PRIVATE' && _teacherSchoolId != null) {
         request.fields['schoolId'] = _teacherSchoolId!;
       }
-
       setState(() => _progress = 0.3);
       final streamed = await request.send();
       setState(() => _progress = 0.8);
       final res = await http.Response.fromStream(streamed);
       setState(() => _progress = 1.0);
-
       if (res.statusCode < 300) {
         widget.toast('"$_title" uploaded successfully!', type: 'success');
         widget.onUploaded();
       } else {
         final body = jsonDecode(res.body);
-        widget.toast(body['message']?.toString() ?? 'Upload failed', type: 'error');
+        widget.toast(body['message']?.toString() ?? 'Upload failed',
+            type: 'error');
       }
     } catch (e) {
       widget.toast('Error: $e', type: 'error');
@@ -215,15 +185,16 @@ class _UploadModalState extends State<UploadModal> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     return Container(
-      color: Colors.black.withValues(alpha: 0.7),
+      color: Colors.black.withValues(alpha: 0.65),
       child: Center(
         child: Container(
           margin: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: _surface,
+            color: t.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF30363D)),
+            border: Border.all(color: t.border),
           ),
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.88,
@@ -235,16 +206,19 @@ class _UploadModalState extends State<UploadModal> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 18, 12, 0),
                 child: Row(children: [
-                  const Text('📤 Upload New Resource',
-                      style: TextStyle(color: _text, fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text('📤 Upload New Resource',
+                      style: TextStyle(
+                          color: t.text,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold)),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close, color: _muted),
+                    icon: Icon(Icons.close, color: t.muted),
                     onPressed: widget.onClose,
                   ),
                 ]),
               ),
-              const Divider(color: _border),
+              Divider(color: t.border),
 
               Flexible(
                 child: SingleChildScrollView(
@@ -253,17 +227,19 @@ class _UploadModalState extends State<UploadModal> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
 
-                      // ── File picker ───────────────────────────────
+                      // ── File picker ──────────────────────────────────
                       GestureDetector(
                         onTap: _uploading ? null : _pickFile,
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 28),
                           decoration: BoxDecoration(
-                            color: _bg,
+                            color: t.bg,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: _pickedFile != null ? _primary : const Color(0xFF30363D),
+                              color: _pickedFile != null
+                                  ? t.primary
+                                  : t.border,
                               width: _pickedFile != null ? 2 : 1,
                             ),
                           ),
@@ -272,11 +248,17 @@ class _UploadModalState extends State<UploadModal> {
                                 style: const TextStyle(fontSize: 30)),
                             const SizedBox(height: 8),
                             Text(
-                              _pickedFile != null ? _pickedFile!.name : 'Tap to browse a file',
+                              _pickedFile != null
+                                  ? _pickedFile!.name
+                                  : 'Tap to browse a file',
                               style: TextStyle(
-                                color: _pickedFile != null ? _primary : _muted,
+                                color: _pickedFile != null
+                                    ? t.primary
+                                    : t.muted,
                                 fontSize: 13,
-                                fontWeight: _pickedFile != null ? FontWeight.w600 : FontWeight.normal,
+                                fontWeight: _pickedFile != null
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -284,14 +266,19 @@ class _UploadModalState extends State<UploadModal> {
                               _pickedFile != null
                                   ? '${(_pickedFile!.size / 1024 / 1024).toStringAsFixed(2)} MB'
                                   : 'PDF, DOCX, MP4, Images',
-                              style: const TextStyle(color: _subtle, fontSize: 11),
+                              style:
+                                  TextStyle(color: t.subtle, fontSize: 11),
                             ),
                             if (_pickedFile != null) ...[
                               const SizedBox(height: 8),
                               GestureDetector(
-                                onTap: () => setState(() { _pickedFile = null; _fileBytes = null; }),
-                                child: const Text('Remove file',
-                                    style: TextStyle(color: _danger, fontSize: 12)),
+                                onTap: () => setState(() {
+                                  _pickedFile = null;
+                                  _fileBytes  = null;
+                                }),
+                                child: Text('Remove file',
+                                    style: TextStyle(
+                                        color: t.danger, fontSize: 12)),
                               ),
                             ],
                           ]),
@@ -304,8 +291,9 @@ class _UploadModalState extends State<UploadModal> {
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
                             value: _progress,
-                            backgroundColor: const Color(0xFF30363D),
-                            valueColor: const AlwaysStoppedAnimation(_primary),
+                            backgroundColor: t.border,
+                            valueColor:
+                                AlwaysStoppedAnimation(t.primary),
                             minHeight: 5,
                           ),
                         ),
@@ -313,32 +301,40 @@ class _UploadModalState extends State<UploadModal> {
 
                       const SizedBox(height: 18),
 
-                      // ── Title ─────────────────────────────────────
-                      _label('Resource Title *'),
-                      _input(hint: 'e.g. Form 3 Biology Notes',
+                      // ── Title ────────────────────────────────────────
+                      _label(t, 'Resource Title *'),
+                      _input(t,
+                          hint: 'e.g. Form 3 Biology Notes',
                           onChanged: (v) => _title = v),
                       const SizedBox(height: 12),
 
-                      // ── Description ───────────────────────────────
-                      _label('Description'),
-                      _input(hint: 'Brief description', maxLines: 2,
+                      // ── Description ──────────────────────────────────
+                      _label(t, 'Description'),
+                      _input(t,
+                          hint: 'Brief description',
+                          maxLines: 2,
                           onChanged: (v) => _description = v),
                       const SizedBox(height: 12),
 
-                      // ── Subject + Form (both required) ────────────
+                      // ── Subject + Form ────────────────────────────────
                       Row(children: [
                         Expanded(child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _label('Subject *'),
+                            _label(t, 'Subject *'),
                             _dropdown<String>(
+                              t,
                               hint: 'Select subject',
                               value: _categoryId,
-                              items: _categories.map((c) => DropdownMenuItem<String>(
-                                value: c['id']?.toString(),
-                                child: Text(c['name']?.toString() ?? ''),
-                              )).toList(),
-                              onChanged: (v) => setState(() => _categoryId = v),
+                              items: _categories
+                                  .map((c) => DropdownMenuItem<String>(
+                                        value: c['id']?.toString(),
+                                        child: Text(
+                                            c['name']?.toString() ?? ''),
+                                      ))
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setState(() => _categoryId = v),
                               hasError: _categoryId == null,
                             ),
                           ],
@@ -347,15 +343,20 @@ class _UploadModalState extends State<UploadModal> {
                         Expanded(child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _label('Form Level *'),
+                            _label(t, 'Form Level *'),
                             _dropdown<String>(
+                              t,
                               hint: 'Select form',
                               value: _classId,
-                              items: _classes.map((c) => DropdownMenuItem<String>(
-                                value: c['id']?.toString(),
-                                child: Text(c['name']?.toString() ?? ''),
-                              )).toList(),
-                              onChanged: (v) => setState(() => _classId = v),
+                              items: _classes
+                                  .map((c) => DropdownMenuItem<String>(
+                                        value: c['id']?.toString(),
+                                        child: Text(
+                                            c['name']?.toString() ?? ''),
+                                      ))
+                                  .toList(),
+                              onChanged: (v) =>
+                                  setState(() => _classId = v),
                               hasError: _classId == null,
                             ),
                           ],
@@ -363,20 +364,25 @@ class _UploadModalState extends State<UploadModal> {
                       ]),
                       const SizedBox(height: 12),
 
-                      // ── Type + Audience ───────────────────────────
+                      // ── Type + Audience ───────────────────────────────
                       Row(children: [
                         Expanded(child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _label('File Type'),
+                            _label(t, 'File Type'),
                             _dropdown<String>(
+                              t,
                               hint: '',
                               value: _selectedLabel,
-                              items: _resourceTypes.map((t) => DropdownMenuItem<String>(
-                                value: t['label'],
-                                child: Text(t['label']!),
-                              )).toList(),
-                              onChanged: (v) { if (v != null) _handleTypeChange(v); },
+                              items: _resourceTypes
+                                  .map((rt) => DropdownMenuItem<String>(
+                                        value: rt['label'],
+                                        child: Text(rt['label']!),
+                                      ))
+                                  .toList(),
+                              onChanged: (v) {
+                                if (v != null) _handleTypeChange(v);
+                              },
                             ),
                           ],
                         )),
@@ -384,62 +390,75 @@ class _UploadModalState extends State<UploadModal> {
                         Expanded(child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _label('Audience'),
+                            _label(t, 'Audience'),
                             _dropdown<String>(
+                              t,
                               hint: '',
                               value: _targetAudience,
-                              items: ['Students', 'Teachers', 'Both'].map((v) =>
-                                  DropdownMenuItem<String>(value: v, child: Text(v))).toList(),
-                              onChanged: (v) => setState(() => _targetAudience = v ?? 'Students'),
+                              items: ['Students', 'Teachers', 'Both']
+                                  .map((v) => DropdownMenuItem<String>(
+                                        value: v,
+                                        child: Text(v),
+                                      ))
+                                  .toList(),
+                              onChanged: (v) => setState(
+                                  () => _targetAudience = v ?? 'Students'),
                             ),
                           ],
                         )),
                       ]),
                       const SizedBox(height: 12),
 
-                      // ── Visibility ────────────────────────────────
-                      _label('Visibility'),
+                      // ── Visibility ────────────────────────────────────
+                      _label(t, 'Visibility'),
                       _dropdown<String>(
+                        t,
                         hint: '',
                         value: _visibility,
                         items: const [
-                          DropdownMenuItem(value: 'PUBLIC',  child: Text('Public')),
-                          DropdownMenuItem(value: 'PRIVATE', child: Text('Private (School Only)')),
+                          DropdownMenuItem(
+                              value: 'PUBLIC', child: Text('Public')),
+                          DropdownMenuItem(
+                              value: 'PRIVATE',
+                              child: Text('Private (School Only)')),
                         ],
-                        onChanged: (v) => setState(() => _visibility = v ?? 'PUBLIC'),
+                        onChanged: (v) =>
+                            setState(() => _visibility = v ?? 'PUBLIC'),
                       ),
 
-                      // Info banner when PRIVATE
                       if (_visibility == 'PRIVATE') ...[
                         const SizedBox(height: 8),
                         Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF3A2A1A),
-                            border: Border.all(color: _amber),
+                            color: t.amberBg,
+                            border: Border.all(color: t.amberText),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             _teacherSchoolId != null
                                 ? '🏫 Visible only to your school.'
                                 : '⚠️ School not found on your profile.',
-                            style: const TextStyle(color: _amber, fontSize: 12),
+                            style: TextStyle(
+                                color: t.amberText, fontSize: 12),
                           ),
                         ),
                       ],
 
                       const SizedBox(height: 22),
 
-                      // ── Buttons ───────────────────────────────────
+                      // ── Buttons ───────────────────────────────────────
                       Row(children: [
                         Expanded(
                           child: OutlinedButton(
                             onPressed: widget.onClose,
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Color(0xFF30363D)),
-                              foregroundColor: _text,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: BorderSide(color: t.border),
+                              foregroundColor: t.text,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8)),
                             ),
@@ -451,16 +470,20 @@ class _UploadModalState extends State<UploadModal> {
                           child: ElevatedButton(
                             onPressed: _uploading ? null : _upload,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _primary,
-                              disabledBackgroundColor: _border,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              backgroundColor: t.primary,
+                              disabledBackgroundColor: t.border,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8)),
                             ),
                             child: Text(
-                              _uploading ? 'Uploading...' : 'Upload Resource',
+                              _uploading
+                                  ? 'Uploading...'
+                                  : 'Upload Resource',
                               style: const TextStyle(
-                                  color: Colors.white, fontWeight: FontWeight.bold),
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold),
                             ),
                           ),
                         ),
@@ -476,40 +499,50 @@ class _UploadModalState extends State<UploadModal> {
     );
   }
 
-  Widget _label(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Text(text, style: const TextStyle(color: _muted, fontSize: 12)),
-  );
+  Widget _label(AppThemeData t, String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child:
+            Text(text, style: TextStyle(color: t.muted, fontSize: 12)),
+      );
 
-  InputDecoration _inputDeco({String hint = '', bool hasError = false}) => InputDecoration(
-    hintText: hint,
-    hintStyle: const TextStyle(color: _subtle),
-    filled: true,
-    fillColor: _bg,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: BorderSide(color: hasError ? _danger : _border),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: BorderSide(color: hasError ? _danger : _border),
-    ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(8),
-      borderSide: const BorderSide(color: _primary, width: 1.5),
-    ),
-  );
+  InputDecoration _inputDeco(AppThemeData t,
+          {String hint = '', bool hasError = false}) =>
+      InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: t.subtle),
+        filled: true,
+        fillColor: t.inputBg,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide:
+              BorderSide(color: hasError ? t.danger : t.textFieldBorder),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide:
+              BorderSide(color: hasError ? t.danger : t.textFieldBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: t.primary, width: 1.5),
+        ),
+      );
 
-  Widget _input({required String hint, int maxLines = 1, required void Function(String) onChanged}) =>
+  Widget _input(AppThemeData t,
+          {required String hint,
+          int maxLines = 1,
+          required void Function(String) onChanged}) =>
       TextField(
         onChanged: onChanged,
         maxLines: maxLines,
-        style: const TextStyle(color: _text, fontSize: 13),
-        decoration: _inputDeco(hint: hint),
+        style: TextStyle(color: t.text, fontSize: 13),
+        decoration: _inputDeco(t, hint: hint),
       );
 
-  Widget _dropdown<T>({
+  Widget _dropdown<T>(
+    AppThemeData t, {
     required String hint,
     required T? value,
     required List<DropdownMenuItem<T>> items,
@@ -518,29 +551,31 @@ class _UploadModalState extends State<UploadModal> {
   }) =>
       DropdownButtonFormField<T>(
         value: value,
-        decoration: _inputDeco(hasError: hasError),
+        decoration: _inputDeco(t, hasError: hasError),
         hint: hint.isNotEmpty
-            ? Text(hint, style: const TextStyle(color: _subtle, fontSize: 13))
+            ? Text(hint,
+                style: TextStyle(color: t.subtle, fontSize: 13))
             : null,
-        dropdownColor: _surface,
-        style: const TextStyle(color: _text, fontSize: 13),
+        dropdownColor: t.surface,
+        style: TextStyle(color: t.text, fontSize: 13),
         items: items,
         onChanged: onChanged,
       );
 }
 
-/// Thin wrapper for pushing as a full screen from teacher_home_screen.dart
 class UploadMaterialScreen extends StatelessWidget {
   const UploadMaterialScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: t.bg,
       appBar: AppBar(
-        backgroundColor: _surface,
-        title: const Text('Upload Material', style: TextStyle(color: _text)),
-        iconTheme: const IconThemeData(color: _text),
+        backgroundColor: t.surface,
+        title: Text('Upload Material', style: TextStyle(color: t.text)),
+        iconTheme: IconThemeData(color: t.text),
+        elevation: 0,
       ),
       body: Stack(children: [
         const SizedBox.expand(),
@@ -549,8 +584,8 @@ class UploadMaterialScreen extends StatelessWidget {
           onUploaded: () => Navigator.pop(context),
           toast: (msg, {String type = 'info'}) {
             final colors = {
-              'success': _primary,
-              'error':   _danger,
+              'success': AppColors.primary,
+              'error':   AppColors.danger,
               'info':    const Color(0xFF58A6FF),
             };
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(

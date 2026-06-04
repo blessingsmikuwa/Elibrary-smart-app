@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:elibrary_smartapp/features/student/screens/structured_tests_tab.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/theme/app_theme.dart';
 
-// ─── Subject / topic map (mirrors web app) ────────────────────────────────────
+// ─── Subject / topic map (unchanged) ─────────────────────────────────────────
 
 const Map<String, List<String>> _subjectTopics = {
   'Biology': ['Cell Structure and Function','Cell Division (Mitosis and Meiosis)','Photosynthesis','Respiration','Transport in Plants','Transport in Animals (Circulatory System)','Nutrition in Plants','Nutrition in Animals (Human Digestive System)','Excretion in Humans','Nervous System','Endocrine System','Reproduction in Plants','Reproduction in Humans','Genetics and Heredity','Evolution and Natural Selection','Ecology and Ecosystems','Classification of Living Things','Disease and Immunity','Biotechnology','Environmental Issues in Malawi'],
@@ -21,31 +22,18 @@ const Map<String, List<String>> _subjectTopics = {
 const _levels = ['Form 1', 'Form 2', 'Form 3', 'Form 4'];
 
 const Map<String, Color> _subjectColors = {
-  'Biology':         Color(0xFF2EA043),
-  'Mathematics':     Color(0xFF1F6FEB),
+  'Biology':         Color(0xFF10B981),
+  'Mathematics':     Color(0xFF34D399),
   'Chemistry':       Color(0xFFA371F7),
   'Physics':         Color(0xFFF0883E),
   'English':         Color(0xFFE3B341),
-  'Geography':       Color(0xFF58A6FF),
+  'Geography':       Color(0xFF6EE7B7),
   'History':         Color(0xFFDA3633),
-  'Civic Education': Color(0xFF56D364),
-  'Computer Studies':Color(0xFF79C0FF),
+  'Civic Education': Color(0xFF059669),
+  'Computer Studies':Color(0xFF0D9488),
 };
 
-// ─── Colours ──────────────────────────────────────────────────────────────────
-
-const _primary = Color(0xFF2EA043);
-const _bg      = Color(0xFF0D1117);
-const _surface = Color(0xFF161B22);
-const _border  = Color(0xFF21262D);
-const _text    = Color(0xFFE6EDF3);
-const _muted   = Color(0xFF8B949E);
-const _subtle  = Color(0xFF6E7681);
-const _red     = Color(0xFFDA3633);
-const _blue    = Color(0xFF1F6FEB);
-const _yellow  = Color(0xFFE3B341);
-
-// ─── Models ───────────────────────────────────────────────────────────────────
+// ─── Models (unchanged) ───────────────────────────────────────────────────────
 
 class _Question {
   final String       text;
@@ -148,11 +136,12 @@ class _Attempt {
 enum _ToastType { success, info, warning, error }
 
 void _showToast(BuildContext context, String msg, [_ToastType type = _ToastType.success]) {
+  const primary = Color(0xFF10B981);
   final colors = {
-    _ToastType.success: (_primary,    const Color(0xFF1A3A2A)),
-    _ToastType.info:    (const Color(0xFF58A6FF), const Color(0xFF0D2A3D)),
-    _ToastType.warning: (_yellow,     const Color(0xFF3D2E0A)),
-    _ToastType.error:   (const Color(0xFFF85149), const Color(0xFF3D1F1F)),
+    _ToastType.success: (primary,                    const Color(0xFF064E3B)),
+    _ToastType.info:    (const Color(0xFF34D399),    const Color(0xFF022C22)),
+    _ToastType.warning: (const Color(0xFFF59E0B),    const Color(0xFF3D2E0A)),
+    _ToastType.error:   (const Color(0xFFF85149),    const Color(0xFF3D1F1F)),
   };
   final icons = {
     _ToastType.success: '✅',
@@ -209,7 +198,7 @@ Future<void> _logAttempt({
 class QuizzesScreen extends StatefulWidget {
   const QuizzesScreen({super.key});
 
-    static void jumpToTab(int index) => _QuizzesScreenState._jump(index);
+  static void jumpToTab(int index) => _QuizzesScreenState._jump(index);
 
   @override State<QuizzesScreen> createState() => _QuizzesScreenState();
 }
@@ -233,18 +222,19 @@ class _QuizzesScreenState extends State<QuizzesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: t.bg,
       appBar: AppBar(
-        title: const Text('🧠 Quizzes'),
-        backgroundColor: _bg,
-        foregroundColor: _text,
+        title: Text('🧠 Quizzes', style: TextStyle(color: t.text)),
+        backgroundColor: t.bg,
+        foregroundColor: t.text,
         elevation: 0,
         bottom: TabBar(
           controller: _tabs,
-          labelColor: _text,
-          unselectedLabelColor: _muted,
-          indicatorColor: _primary,
+          labelColor: t.text,
+          unselectedLabelColor: t.muted,
+          indicatorColor: t.primary,
           isScrollable: true,
           tabs: const [
             Tab(text: '🤖 AI Quiz'),
@@ -274,14 +264,15 @@ class _QuizzesScreenState extends State<QuizzesScreen>
 // ─── Shared widgets ───────────────────────────────────────────────────────────
 
 class _ProgressBar extends StatefulWidget {
-  final int   value; // 0–100
-  final Color color;
-  const _ProgressBar({required this.value, this.color = _primary});
+  final int   value;
+  final Color? color;
+  const _ProgressBar({required this.value, this.color});
   @override State<_ProgressBar> createState() => _ProgressBarState();
 }
 
 class _ProgressBarState extends State<_ProgressBar> {
   double _width = 0;
+
   @override
   void initState() {
     super.initState();
@@ -290,20 +281,22 @@ class _ProgressBarState extends State<_ProgressBar> {
     });
   }
 
-  Color get _color {
-    if (widget.value >= 75) return widget.color;
-    if (widget.value >= 50) return _yellow;
-    return _red;
+  Color _resolveColor(AppThemeData t) {
+    final base = widget.color ?? t.primary;
+    if (widget.value >= 75) return base;
+    if (widget.value >= 50) return t.amber;
+    return t.danger;
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(4),
       child: LinearProgressIndicator(
         value: _width / 100,
-        backgroundColor: _border,
-        valueColor: AlwaysStoppedAnimation<Color>(_color),
+        backgroundColor: t.border,
+        valueColor: AlwaysStoppedAnimation<Color>(_resolveColor(t)),
         minHeight: 6,
       ),
     );
@@ -314,33 +307,41 @@ class _Card extends StatelessWidget {
   final Widget child;
   final EdgeInsets padding;
   const _Card({required this.child, this.padding = const EdgeInsets.all(16)});
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: padding,
-    decoration: BoxDecoration(
-      color: _surface, border: Border.all(color: _border),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: child,
-  );
+  Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: t.surface, border: Border.all(color: t.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: child,
+    );
+  }
 }
 
 class _Tag extends StatelessWidget {
   final String label; final Color? fg; final Color? bg; final bool outlined;
   const _Tag({required this.label, this.fg, this.bg, this.outlined = false});
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-      color: outlined ? Colors.transparent : bg,
-      border: outlined ? Border.all(color: _border) : null,
-      borderRadius: BorderRadius.circular(4),
-    ),
-    child: Text(label, style: TextStyle(
-      fontSize: 11, fontWeight: FontWeight.w600,
-      color: outlined ? _subtle : fg,
-    )),
-  );
+  Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: outlined ? Colors.transparent : bg,
+        border: outlined ? Border.all(color: t.border) : null,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(label, style: TextStyle(
+        fontSize: 11, fontWeight: FontWeight.w600,
+        color: outlined ? t.subtle : fg,
+      )),
+    );
+  }
 }
 
 class _Dropdown extends StatelessWidget {
@@ -350,18 +351,19 @@ class _Dropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     final safe = (value != null && items.contains(value)) ? value : null;
     return DropdownButtonFormField<String>(
-      value: safe, isExpanded: true, dropdownColor: _surface,
-      style: const TextStyle(color: _text, fontSize: 14),
+      value: safe, isExpanded: true, dropdownColor: t.surface,
+      style: TextStyle(color: t.text, fontSize: 14),
       decoration: InputDecoration(
-        labelText: label, labelStyle: const TextStyle(color: _muted),
-        filled: true, fillColor: _bg,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _border)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _border)),
+        labelText: label, labelStyle: TextStyle(color: t.muted),
+        filled: true, fillColor: t.inputFill,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: t.border)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: t.border)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
-      hint: Text(label, style: const TextStyle(color: _muted, fontSize: 14)),
+      hint: Text(label, style: TextStyle(color: t.muted, fontSize: 14)),
       items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis))).toList(),
       onChanged: onChanged,
     );
@@ -374,7 +376,7 @@ class _QuizRunner extends StatefulWidget {
   final List<_Question> questions;
   final String subject, level, topic, source;
   final String?       quizId;
-  final bool          isSaved;   // true = retake, skip auto-save
+  final bool          isSaved;
   final VoidCallback  onDone;
 
   const _QuizRunner({
@@ -420,7 +422,6 @@ class _QuizRunnerState extends State<_QuizRunner> {
       score: correct, total: widget.questions.length, percentage: pct,
     );
 
-    // Auto-save AI quizzes on first completion
     if (widget.source == 'AI' && !widget.isSaved && !_autoSaveFired && mounted) {
       _autoSaveFired = true;
       try {
@@ -442,35 +443,36 @@ class _QuizRunnerState extends State<_QuizRunner> {
     }
   }
 
-  Color _optionBg(int qi, int oi) {
-    if (_score == null) return _answers[qi] == oi ? _primary.withValues(alpha: 0.15) : Colors.transparent;
+  Color _optionBg(int qi, int oi, AppThemeData t) {
+    if (_score == null) return _answers[qi] == oi ? t.primary.withValues(alpha: 0.15) : Colors.transparent;
     final correct  = widget.questions[qi].correct;
     final selected = _answers[qi] == oi;
-    if (correct  == oi) return _primary.withValues(alpha: 0.15);
-    if (selected)        return _red.withValues(alpha: 0.15);
+    if (correct  == oi) return t.primary.withValues(alpha: 0.15);
+    if (selected)        return t.danger.withValues(alpha: 0.15);
     return Colors.transparent;
   }
 
-  Color _optionBorder(int qi, int oi) {
-    if (_score == null) return _answers[qi] == oi ? _primary : _border;
+  Color _optionBorder(int qi, int oi, AppThemeData t) {
+    if (_score == null) return _answers[qi] == oi ? t.primary : t.border;
     final correct  = widget.questions[qi].correct;
     final selected = _answers[qi] == oi;
-    if (correct  == oi) return _primary;
-    if (selected)        return _red;
-    return _border;
+    if (correct  == oi) return t.primary;
+    if (selected)        return t.danger;
+    return t.border;
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     final answered = _answers.length;
     final total    = widget.questions.length;
     return ListView(
       padding: const EdgeInsets.all(14),
       children: [
         Text('${widget.subject}  ·  ${widget.level}  ·  ${widget.topic}',
-            style: const TextStyle(color: _muted, fontSize: 12)),
+            style: TextStyle(color: t.muted, fontSize: 12)),
         Text('$answered / $total answered',
-            style: const TextStyle(color: _subtle, fontSize: 12)),
+            style: TextStyle(color: t.subtle, fontSize: 12)),
         const SizedBox(height: 6),
         _ProgressBar(value: total == 0 ? 0 : (answered * 100 ~/ total)),
         const SizedBox(height: 14),
@@ -478,7 +480,7 @@ class _QuizRunnerState extends State<_QuizRunner> {
         for (var i = 0; i < total; i++) ...[
           _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('${i + 1}. ${widget.questions[i].text}',
-                style: const TextStyle(color: _text, fontWeight: FontWeight.w700, fontSize: 15)),
+                style: TextStyle(color: t.text, fontWeight: FontWeight.w700, fontSize: 15)),
             const SizedBox(height: 12),
             for (var j = 0; j < widget.questions[i].options.length; j++)
               GestureDetector(
@@ -488,18 +490,18 @@ class _QuizRunnerState extends State<_QuizRunner> {
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: _optionBg(i, j),
-                    border: Border.all(color: _optionBorder(i, j)),
+                    color: _optionBg(i, j, t),
+                    border: Border.all(color: _optionBorder(i, j, t)),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(children: [
                     Icon(
                       _answers[i] == j ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                      color: _answers[i] == j ? _primary : _subtle, size: 20,
+                      color: _answers[i] == j ? t.primary : t.subtle, size: 20,
                     ),
                     const SizedBox(width: 10),
                     Expanded(child: Text(widget.questions[i].options[j],
-                        style: const TextStyle(color: _text))),
+                        style: TextStyle(color: t.text))),
                     if (_score != null && widget.questions[i].correct == j)
                       const Text('✅'),
                     if (_score != null && _answers[i] == j && widget.questions[i].correct != j)
@@ -517,18 +519,18 @@ class _QuizRunnerState extends State<_QuizRunner> {
             icon: const Icon(Icons.check_circle_outline),
             label: const Text('Submit Quiz'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: _primary,          // ← green, matches web
+              backgroundColor: t.primary,
               minimumSize: const Size.fromHeight(48),
             ),
           )
         else ...[
           _Card(child: Column(children: [
-            const Text('Quiz Complete! 🎉',
-                style: TextStyle(color: _primary, fontSize: 22, fontWeight: FontWeight.w800)),
+            Text('Quiz Complete! 🎉',
+                style: TextStyle(color: t.primary, fontSize: 22, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
             Text(
               'Score: $_score / $total  (${((_score! / total) * 100).round()}%)',
-              style: const TextStyle(color: _text, fontSize: 17, fontWeight: FontWeight.w700),
+              style: TextStyle(color: t.text, fontSize: 17, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 6),
             _ProgressBar(value: ((_score! / total) * 100).round()),
@@ -537,7 +539,7 @@ class _QuizRunnerState extends State<_QuizRunner> {
               _score == total ? 'Perfect! Excellent work!'
               : _score! >= (total * 0.7) ? 'Great job! Keep it up!'
               : 'Good effort! Try again to improve.',
-              style: const TextStyle(color: _muted),
+              style: TextStyle(color: t.muted),
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
@@ -545,7 +547,7 @@ class _QuizRunnerState extends State<_QuizRunner> {
               icon: const Icon(Icons.refresh),
               label: const Text('🔄 Back'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _primary,
+                backgroundColor: t.primary,
                 minimumSize: const Size(180, 44),
               ),
             ),
@@ -584,7 +586,6 @@ class _AITabState extends State<_AITab> {
         headers: headers,
         body: jsonEncode({'subject': _subject, 'level': _level, 'topic': _topic}),
       );
-      // ✅ FIX: accept any 2xx (backend returns 201)
       if (res.statusCode >= 300) {
         Map<String, dynamic> d = {};
         try { d = jsonDecode(res.body) as Map<String, dynamic>; } catch (_) {}
@@ -612,6 +613,7 @@ class _AITabState extends State<_AITab> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     if (_questions != null && _meta != null) {
       return _QuizRunner(
         questions: _questions!,
@@ -625,11 +627,11 @@ class _AITabState extends State<_AITab> {
 
     return ListView(padding: const EdgeInsets.all(16), children: [
       _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Row(children: [
-          Icon(Icons.psychology_outlined, color: _primary),
-          SizedBox(width: 10),
+        Row(children: [
+          Icon(Icons.psychology_outlined, color: t.primary),
+          const SizedBox(width: 10),
           Text('AI Quiz Generator',
-              style: TextStyle(color: _primary, fontSize: 20, fontWeight: FontWeight.w800)),
+              style: TextStyle(color: t.primary, fontSize: 20, fontWeight: FontWeight.w800)),
         ]),
         const SizedBox(height: 16),
         _Dropdown(
@@ -656,17 +658,17 @@ class _AITabState extends State<_AITab> {
           icon: Icon(_loading ? Icons.hourglass_top : Icons.smart_toy),
           label: Text(_loading ? 'Generating...' : '🤖 Generate Quiz'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: _primary, minimumSize: const Size.fromHeight(48),
+            backgroundColor: t.primary, minimumSize: const Size.fromHeight(48),
           ),
         ),
       ])),
       if (_loading)
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 36),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 36),
           child: Column(children: [
-            CircularProgressIndicator(color: _primary),
-            SizedBox(height: 12),
-            Text('Generating your quiz, please wait…', style: TextStyle(color: _muted)),
+            CircularProgressIndicator(color: t.primary),
+            const SizedBox(height: 12),
+            Text('Generating your quiz, please wait…', style: TextStyle(color: t.muted)),
           ]),
         ),
     ]);
@@ -731,7 +733,6 @@ class _SavedAITabState extends State<_SavedAITab> {
     }
   }
 
-  // quizId → last attempt percentage
   Map<String, int> get _lastScoreMap {
     final m = <String, int>{};
     for (final a in _attempts) {
@@ -744,6 +745,7 @@ class _SavedAITabState extends State<_SavedAITab> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     if (_retake != null) {
       return _QuizRunner(
         questions: _retake!.questions,
@@ -758,7 +760,7 @@ class _SavedAITabState extends State<_SavedAITab> {
     }
 
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: _primary));
+      return Center(child: CircularProgressIndicator(color: t.primary));
     }
 
     final scoreMap = _lastScoreMap;
@@ -768,30 +770,30 @@ class _SavedAITabState extends State<_SavedAITab> {
     ).toList();
 
     return RefreshIndicator(
-      color: _primary,
+      color: t.primary,
       onRefresh: _fetch,
       child: ListView(padding: const EdgeInsets.all(14), children: [
         TextField(
-          style: const TextStyle(color: _text),
+          style: TextStyle(color: t.text),
           decoration: InputDecoration(
-            hintText: 'Search saved quizzes…', hintStyle: const TextStyle(color: _subtle),
-            prefixIcon: const Icon(Icons.search, color: _muted),
-            filled: true, fillColor: _surface,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _border)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _border)),
+            hintText: 'Search saved quizzes…', hintStyle: TextStyle(color: t.subtle),
+            prefixIcon: Icon(Icons.search, color: t.muted),
+            filled: true, fillColor: t.surface,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: t.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: t.border)),
           ),
           onChanged: (v) => setState(() => _search = v),
         ),
         const SizedBox(height: 14),
         if (filtered.isEmpty)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 60),
+              padding: const EdgeInsets.symmetric(vertical: 60),
               child: Column(children: [
-                Text('🤖', style: TextStyle(fontSize: 40)),
-                SizedBox(height: 12),
+                const Text('🤖', style: TextStyle(fontSize: 40)),
+                const SizedBox(height: 12),
                 Text('No saved AI quizzes yet.\nGenerate a quiz — it will be saved here automatically.',
-                    style: TextStyle(color: _subtle), textAlign: TextAlign.center),
+                    style: TextStyle(color: t.subtle), textAlign: TextAlign.center),
               ]),
             ),
           )
@@ -803,21 +805,21 @@ class _SavedAITabState extends State<_SavedAITab> {
               child: _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Wrap(spacing: 6, children: [
                   if (q.subject != null)
-                    _Tag(label: q.subject!, fg: _primary, bg: const Color(0xFF1A3A2A)),
+                    _Tag(label: q.subject!, fg: t.primary, bg: t.primary.withValues(alpha: 0.15)),
                   if (q.form != null) _Tag(label: q.form!, outlined: true),
-                  _Tag(label: '🤖 AI Saved', fg: const Color(0xFF58A6FF), bg: const Color(0xFF0D2A3D)),
+                  _Tag(label: '🤖 AI Saved', fg: t.teal, bg: t.teal.withValues(alpha: 0.15)),
                 ]),
                 const SizedBox(height: 8),
                 Text(q.title,
-                    style: const TextStyle(color: _text, fontWeight: FontWeight.w700, fontSize: 15)),
+                    style: TextStyle(color: t.text, fontWeight: FontWeight.w700, fontSize: 15)),
                 Text('${q.questions.length} questions · Saved ${q.formattedDate}',
-                    style: const TextStyle(color: _subtle, fontSize: 12)),
+                    style: TextStyle(color: t.subtle, fontSize: 12)),
                 if (lastScore != null) ...[
                   const SizedBox(height: 8),
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    const Text('Last score', style: TextStyle(color: _subtle, fontSize: 12)),
+                    Text('Last score', style: TextStyle(color: t.subtle, fontSize: 12)),
                     Text('$lastScore%',
-                        style: const TextStyle(color: _primary, fontWeight: FontWeight.bold, fontSize: 12)),
+                        style: TextStyle(color: t.primary, fontWeight: FontWeight.bold, fontSize: 12)),
                   ]),
                   const SizedBox(height: 4),
                   _ProgressBar(value: lastScore),
@@ -828,7 +830,7 @@ class _SavedAITabState extends State<_SavedAITab> {
                     child: ElevatedButton(
                       onPressed: () => setState(() => _retake = q),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _primary,
+                        backgroundColor: t.primary,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                       child: Text(lastScore != null ? '▶ Retake Quiz' : '▶ Take Quiz',
@@ -836,7 +838,7 @@ class _SavedAITabState extends State<_SavedAITab> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, color: _red),
+                    icon: Icon(Icons.delete_outline, color: t.danger),
                     onPressed: () => _delete(q.id),
                   ),
                 ]),
@@ -888,7 +890,8 @@ class _TeacherTabState extends State<_TeacherTab> {
     } catch (_) {
       if (mounted) _showToast(context, 'Failed to load quizzes.', _ToastType.error);
     } finally {
-      if (mounted) setState(() => _loading = false); }
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   List<_SavedQuiz> get _filtered {
@@ -903,6 +906,7 @@ class _TeacherTabState extends State<_TeacherTab> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
     if (_active != null) {
       return _QuizRunner(
         questions: _active!.questions,
@@ -917,33 +921,33 @@ class _TeacherTabState extends State<_TeacherTab> {
 
     return ListView(padding: const EdgeInsets.all(14), children: [
       TextField(
-        style: const TextStyle(color: _text),
+        style: TextStyle(color: t.text),
         decoration: InputDecoration(
-          hintText: 'Search quizzes…', hintStyle: const TextStyle(color: _subtle),
-          prefixIcon: const Icon(Icons.search, color: _muted),
-          filled: true, fillColor: _surface,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _border)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _border)),
+          hintText: 'Search quizzes…', hintStyle: TextStyle(color: t.subtle),
+          prefixIcon: Icon(Icons.search, color: t.muted),
+          filled: true, fillColor: t.surface,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: t.border)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: t.border)),
         ),
         onChanged: (v) => setState(() => _search = v),
       ),
       const SizedBox(height: 10),
       Row(children: [
-        Expanded(child: _SubTabBtn(label: '🌐 Online', selected: !_showOffline,
+        Expanded(child: _SubTabBtn(label: '🌐 Online', selected: !_showOffline, theme: t,
             onTap: () => setState(() => _showOffline = false))),
         const SizedBox(width: 8),
-        Expanded(child: _SubTabBtn(label: '📄 Offline / Print', selected: _showOffline,
+        Expanded(child: _SubTabBtn(label: '📄 Offline / Print', selected: _showOffline, theme: t,
             onTap: () => setState(() => _showOffline = true))),
       ]),
       const SizedBox(height: 14),
       if (_loading)
-        const Center(child: CircularProgressIndicator(color: _primary))
+        Center(child: CircularProgressIndicator(color: t.primary))
       else if (_filtered.isEmpty)
         Center(child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 40),
           child: Text(
             _showOffline ? 'No offline quizzes available.' : 'No online quizzes available.',
-            style: const TextStyle(color: _subtle),
+            style: TextStyle(color: t.subtle),
           ),
         ))
       else
@@ -952,37 +956,37 @@ class _TeacherTabState extends State<_TeacherTab> {
           child: _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Wrap(spacing: 6, children: [
               if (quiz.subject != null)
-                _Tag(label: quiz.subject!, fg: _primary, bg: const Color(0xFF1A3A2A)),
+                _Tag(label: quiz.subject!, fg: t.primary, bg: t.primary.withValues(alpha: 0.15)),
               if (quiz.form != null) _Tag(label: quiz.form!, outlined: true),
               _Tag(
                 label: quiz.visibility == 'PUBLIC' ? '🌐 Public' : '🔒 School',
-                fg:    quiz.visibility == 'PUBLIC' ? const Color(0xFF58A6FF) : const Color(0xFFA371F7),
-                bg:    quiz.visibility == 'PUBLIC' ? const Color(0xFF1A2A3A) : const Color(0xFF2A1A3A),
+                fg:    quiz.visibility == 'PUBLIC' ? t.teal : const Color(0xFFA371F7),
+                bg:    quiz.visibility == 'PUBLIC' ? t.teal.withValues(alpha: 0.15) : const Color(0xFF2A1A3A),
               ),
             ]),
             const SizedBox(height: 8),
             Text(quiz.title,
-                style: const TextStyle(color: _text, fontWeight: FontWeight.w700, fontSize: 15)),
+                style: TextStyle(color: t.text, fontWeight: FontWeight.w700, fontSize: 15)),
             if (quiz.description != null)
               Text(quiz.description!, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: _subtle, fontSize: 12)),
+                  style: TextStyle(color: t.subtle, fontSize: 12)),
             const SizedBox(height: 10),
             Row(children: [
               Text('❓ ${quiz.questions.length} questions · 📅 ${quiz.formattedDate}',
-                  style: const TextStyle(color: _subtle, fontSize: 12)),
+                  style: TextStyle(color: t.subtle, fontSize: 12)),
               const Spacer(),
               if (!_showOffline)
                 ElevatedButton(
                   onPressed: () => setState(() => _active = quiz),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _primary,
+                    backgroundColor: t.primary,
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   ),
                   child: const Text('▶ Take Quiz',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 )
               else
-                const Text('📄 Offline', style: TextStyle(color: Color(0xFF58A6FF), fontSize: 12)),
+                Text('📄 Offline', style: TextStyle(color: t.teal, fontSize: 12)),
             ]),
           ])),
         )),
@@ -992,20 +996,22 @@ class _TeacherTabState extends State<_TeacherTab> {
 
 class _SubTabBtn extends StatelessWidget {
   final String label; final bool selected; final VoidCallback onTap;
-  const _SubTabBtn({required this.label, required this.selected, required this.onTap});
+  final AppThemeData theme;
+  const _SubTabBtn({required this.label, required this.selected, required this.onTap, required this.theme});
+
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        color: selected ? _primary : _surface,
-        border: Border.all(color: selected ? _primary : _border),
+        color: selected ? theme.primary : theme.surface,
+        border: Border.all(color: selected ? theme.primary : theme.border),
         borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
       child: Text(label, style: TextStyle(
-        color: selected ? Colors.white : _muted,
+        color: selected ? Colors.white : theme.muted,
         fontWeight: FontWeight.w600, fontSize: 13,
       )),
     ),
@@ -1022,7 +1028,7 @@ class _ProgressTab extends StatefulWidget {
 class _ProgressTabState extends State<_ProgressTab> {
   List<_Attempt> _attempts = [];
   bool           _loading  = true;
-  String?        _selected; // selected subject for detail
+  String?        _selected;
 
   @override
   void initState() { super.initState(); _fetch(); }
@@ -1043,15 +1049,15 @@ class _ProgressTabState extends State<_ProgressTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator(color: _primary));
+    final t = AppTheme.of(context);
+    if (_loading) return Center(child: CircularProgressIndicator(color: t.primary));
 
-    // Group by subject
     final bySubject = <String, List<_Attempt>>{};
     for (final a in _attempts) {
       bySubject.putIfAbsent(a.subject, () => []).add(a);
     }
-    final subjects    = bySubject.keys.toList();
-    final overallAvg  = _attempts.isEmpty ? 0
+    final subjects   = bySubject.keys.toList();
+    final overallAvg = _attempts.isEmpty ? 0
         : (_attempts.fold(0, (s, a) => s + a.percentage) / _attempts.length).round();
 
     final recent    = _attempts.take(5).toList();
@@ -1061,25 +1067,24 @@ class _ProgressTabState extends State<_ProgressTab> {
     final trend     = recentAvg - prevAvg;
 
     return RefreshIndicator(
-      color: _primary,
+      color: t.primary,
       onRefresh: _fetch,
       child: ListView(padding: const EdgeInsets.all(14), children: [
-        // Overall card
         _Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Overall Progress',
-                  style: TextStyle(color: _text, fontSize: 16, fontWeight: FontWeight.w700)),
+              Text('Overall Progress',
+                  style: TextStyle(color: t.text, fontSize: 16, fontWeight: FontWeight.w700)),
               Text('${_attempts.length} attempts · ${subjects.length} subjects',
-                  style: const TextStyle(color: _subtle, fontSize: 12)),
+                  style: TextStyle(color: t.subtle, fontSize: 12)),
             ]),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text('$overallAvg%',
-                  style: const TextStyle(color: _primary, fontSize: 28, fontWeight: FontWeight.w800)),
+                  style: TextStyle(color: t.primary, fontSize: 28, fontWeight: FontWeight.w800)),
               if (trend != 0 && prev.isNotEmpty)
                 Text(
                   '${trend > 0 ? "↑" : "↓"} ${trend.abs()}% vs last period',
-                  style: TextStyle(color: trend > 0 ? _primary : _red, fontSize: 11),
+                  style: TextStyle(color: trend > 0 ? t.primary : t.danger, fontSize: 11),
                 ),
             ]),
           ]),
@@ -1090,32 +1095,32 @@ class _ProgressTabState extends State<_ProgressTab> {
             overallAvg >= 75 ? '🌟 Excellent work! Keep it up!'
             : overallAvg >= 50 ? '📈 Good progress! Push for 75%+'
             : '💪 Keep practising — you\'ll get there!',
-            style: const TextStyle(color: _subtle, fontSize: 12),
+            style: TextStyle(color: t.subtle, fontSize: 12),
           ),
         ])),
         const SizedBox(height: 14),
 
         if (subjects.isEmpty)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 60),
+              padding: const EdgeInsets.symmetric(vertical: 60),
               child: Column(children: [
-                Text('📊', style: TextStyle(fontSize: 40)),
-                SizedBox(height: 12),
+                const Text('📊', style: TextStyle(fontSize: 40)),
+                const SizedBox(height: 12),
                 Text('No quiz data yet.\nTake some quizzes to track your progress!',
-                    style: TextStyle(color: _subtle), textAlign: TextAlign.center),
+                    style: TextStyle(color: t.subtle), textAlign: TextAlign.center),
               ]),
             ),
           )
         else ...[
-          const Text('Subject Breakdown',
-              style: TextStyle(color: _muted, fontSize: 13, fontWeight: FontWeight.w600)),
+          Text('Subject Breakdown',
+              style: TextStyle(color: t.muted, fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           ...subjects.map((sub) {
             final list  = bySubject[sub]!;
             final avg   = (list.fold(0,(s,a)=>s+a.percentage) / list.length).round();
             final best  = list.map((a)=>a.percentage).reduce((a,b)=>a>b?a:b);
-            final color = _subjectColors[sub] ?? _primary;
+            final color = _subjectColors[sub] ?? t.primary;
             final isSelected = _selected == sub;
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -1126,21 +1131,20 @@ class _ProgressTabState extends State<_ProgressTab> {
                     Expanded(child: Text(sub,
                         style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 14))),
                     Text('${list.length} attempt${list.length!=1?"s":""}',
-                        style: const TextStyle(color: _subtle, fontSize: 12)),
-                    Icon(isSelected ? Icons.expand_less : Icons.expand_more, color: _muted, size: 18),
+                        style: TextStyle(color: t.subtle, fontSize: 12)),
+                    Icon(isSelected ? Icons.expand_less : Icons.expand_more, color: t.muted, size: 18),
                   ]),
                 ),
                 const SizedBox(height: 6),
                 _ProgressBar(value: avg, color: color),
                 const SizedBox(height: 4),
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text('Avg: $avg%', style: const TextStyle(color: _subtle, fontSize: 11)),
-                  Text('Best: $best%', style: const TextStyle(color: _subtle, fontSize: 11)),
+                  Text('Avg: $avg%', style: TextStyle(color: t.subtle, fontSize: 11)),
+                  Text('Best: $best%', style: TextStyle(color: t.subtle, fontSize: 11)),
                 ]),
-                // Topic breakdown (expanded)
                 if (isSelected) ...[
-                  const Divider(color: _border, height: 20),
-                  const Text('By Topic', style: TextStyle(color: _muted, fontSize: 12, fontWeight: FontWeight.w600)),
+                  Divider(color: t.border, height: 20),
+                  Text('By Topic', style: TextStyle(color: t.muted, fontSize: 12, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   ...() {
                     final byTopic = <String, List<_Attempt>>{};
@@ -1154,10 +1158,10 @@ class _ProgressTabState extends State<_ProgressTab> {
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                             Expanded(child: Text(e.key,
-                                style: const TextStyle(color: _text, fontSize: 12),
+                                style: TextStyle(color: t.text, fontSize: 12),
                                 overflow: TextOverflow.ellipsis)),
                             Text('$tAvg% · ${e.value.length}x',
-                                style: const TextStyle(color: _muted, fontSize: 11)),
+                                style: TextStyle(color: t.muted, fontSize: 11)),
                           ]),
                           const SizedBox(height: 4),
                           _ProgressBar(value: tAvg, color: color),
@@ -1213,10 +1217,11 @@ class _HistoryTabState extends State<_HistoryTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator(color: _primary));
+    final t = AppTheme.of(context);
+    if (_loading) return Center(child: CircularProgressIndicator(color: t.primary));
 
     return RefreshIndicator(
-      color: _primary,
+      color: t.primary,
       onRefresh: _fetch,
       child: ListView(padding: const EdgeInsets.all(14), children: [
         if (_stats != null) ...[
@@ -1234,11 +1239,11 @@ class _HistoryTabState extends State<_HistoryTab> {
           const SizedBox(height: 16),
         ],
         if (_attempts.isEmpty)
-          const Center(
+          Center(
             child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 40),
+              padding: const EdgeInsets.symmetric(vertical: 40),
               child: Text('No quiz history yet. Take a quiz to see results here.',
-                  textAlign: TextAlign.center, style: TextStyle(color: _subtle)),
+                  textAlign: TextAlign.center, style: TextStyle(color: t.subtle)),
             ),
           )
         else
@@ -1248,19 +1253,19 @@ class _HistoryTabState extends State<_HistoryTab> {
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(
                   '${a.subject}${a.topic != null ? " — ${a.topic}" : ""}',
-                  style: const TextStyle(color: _text, fontWeight: FontWeight.w700, fontSize: 14),
+                  style: TextStyle(color: t.text, fontWeight: FontWeight.w700, fontSize: 14),
                 ),
                 Text(
                   '${a.level ?? ""}  ·  ${a.source == "AI" ? "🤖 AI Generated" : "👩‍🏫 Teacher Quiz"}',
-                  style: const TextStyle(color: _subtle, fontSize: 12),
+                  style: TextStyle(color: t.subtle, fontSize: 12),
                 ),
                 if (a.formattedDate.isNotEmpty)
-                  Text(a.formattedDate, style: const TextStyle(color: _subtle, fontSize: 11)),
+                  Text(a.formattedDate, style: TextStyle(color: t.subtle, fontSize: 11)),
               ])),
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                 Text('${a.score}/${a.total}',
-                    style: const TextStyle(color: _primary, fontSize: 18, fontWeight: FontWeight.w800)),
-                Text('${a.percentage}%', style: const TextStyle(color: _subtle, fontSize: 13)),
+                    style: TextStyle(color: t.primary, fontSize: 18, fontWeight: FontWeight.w800)),
+                Text('${a.percentage}%', style: TextStyle(color: t.subtle, fontSize: 13)),
               ]),
             ])),
           )),
@@ -1272,17 +1277,21 @@ class _HistoryTabState extends State<_HistoryTab> {
 class _StatCard extends StatelessWidget {
   final String label, value;
   const _StatCard({required this.label, required this.value});
+
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: _surface, border: Border.all(color: _border),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Text(value, style: const TextStyle(color: _primary, fontSize: 22, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 4),
-      Text(label, style: const TextStyle(color: _subtle, fontSize: 11), textAlign: TextAlign.center),
-    ]),
-  );
+  Widget build(BuildContext context) {
+    final t = AppTheme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: t.surface, border: Border.all(color: t.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Text(value, style: TextStyle(color: t.primary, fontSize: 22, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text(label, style: TextStyle(color: t.subtle, fontSize: 11), textAlign: TextAlign.center),
+      ]),
+    );
+  }
 }
